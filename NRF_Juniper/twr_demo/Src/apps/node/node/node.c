@@ -1260,12 +1260,18 @@ error_e node_process_init()
     /* Configure DW IC's UWB mode, sets power and antenna delays for TWR mode */
     rxtx_configure_t p;
     p.pdwCfg      = &app.pConfig->dwt_config;
-    p.frameFilter = DWT_FF_DISABLE;    //DWT_FF_ENABLE_802_15_4
-    p.frameFilterMode   = (DWT_FF_DATA_EN | DWT_FF_ACK_EN); //FIXME
+    /* HW frame filtering: accept data frames addressed to this node (Poll, Final),
+     * ACK frames, and blink frames (frame type 5 = multipurpose/reserved, no dest addr). */
+    p.frameFilter     = DWT_FF_ENABLE_802_15_4;
+    p.frameFilterMode = DWT_FF_DATA_EN       /* Poll & Final addressed to this node */
+                      | DWT_FF_ACK_EN        /* ACK frames */
+                      | DWT_FF_RSVD_EN       /* blink frame type (0xC5, type=5 reserved) */
+                      | DWT_FF_MULTI_EN      /* blink frame type (0xC5, type=5 multipurpose in 802.15.4-2015) */
+                      | DWT_FF_IMPBRCAST_EN; /* blinks carry no dest address — implicit broadcast */
     p.txAntDelay  = app.pConfig->s.antTx_a;
     p.rxAntDelay  = app.pConfig->s.antRx_a;
-    p.panId       = pNodeInfo->panID;//PanID : does not matter : DWT_FF_NOTYPE_EN : will be reconfigured on reception of RI message
-    p.shortadd    = pNodeInfo->eui16;//ShortAddr
+    p.panId       = pNodeInfo->panID;
+    p.shortadd    = pNodeInfo->eui16;
 
     rxtx_configure(&p);
     if(app.pConfig->s.pdoaOffset_deg < 0)

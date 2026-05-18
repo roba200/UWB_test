@@ -470,12 +470,17 @@ error_e tag_process_init(void)
     /* Configure receiver's UWB mode, set power and antenna delays for TWR mode */
     rxtx_configure_t p;
     p.pdwCfg      = &app.pConfig->dwt_config;
-    p.frameFilter = DWT_FF_DISABLE;    //DWT_FF_ENABLE_802_15_4
-    p.frameFilterMode   = (DWT_FF_DATA_EN | DWT_FF_ACK_EN); //FIXME
+    /* HW frame filtering is intentionally OFF during discovery. The tag has no
+     * assigned PAN ID or short address yet (placeholders 0x5555/0xAAAA), so HW
+     * filtering would block the Ranging Config from every node. Filtering is
+     * enabled in initiator_received_ranging_config() once the real PAN ID and
+     * short address arrive from the node. */
+    p.frameFilter     = DWT_FF_DISABLE;
+    p.frameFilterMode = DWT_FF_DATA_EN | DWT_FF_ACK_EN;
     p.txAntDelay  = app.pConfig->s.antTx_a;
     p.rxAntDelay  = app.pConfig->s.antRx_a;
-    p.panId       = 0x5555;//PanID : does not matter : DWT_FF_NOTYPE_EN : will be reconfigured on reception of RI message
-    p.shortadd    = 0xAAAA;//ShortAddr : does not matter : DWT_FF_NOTYPE_EN : will be reconfigured on reception of RI message
+    p.panId       = 0x5555;
+    p.shortadd    = 0xAAAA;
 
     rxtx_configure(&p);
 
@@ -985,8 +990,13 @@ error_e initiator_received_ranging_config(rx_pckt_t_t *pRxPckt, tag_info_t *pTwr
 
         rxtx_configure_t p;
         p.pdwCfg      = &app.pConfig->dwt_config;
-        p.frameFilter = DWT_FF_DISABLE;////DWT_FF_ENABLE_802_15_4
-        p.frameFilterMode = (DWT_FF_DATA_EN | DWT_FF_ACK_EN); //FIXME
+        /* HW frame filtering: PAN ID and tag short address are now known from the
+         * Ranging Config, so enable filtering to accept only responses addressed
+         * to this tag from the correct node's PAN. Blink-type frames not expected
+         * in ranging phase so only DATA and ACK needed. */
+        p.frameFilter     = DWT_FF_ENABLE_802_15_4;
+        p.frameFilterMode = DWT_FF_DATA_EN   /* Response & RangingConfig addressed to this tag */
+                          | DWT_FF_ACK_EN;   /* ACK frames */
         p.txAntDelay  = app.pConfig->s.antTx_a;
         p.rxAntDelay  = app.pConfig->s.antRx_a;
         p.panId       = pTwrInfo->env.panID;
