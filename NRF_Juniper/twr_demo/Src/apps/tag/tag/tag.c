@@ -517,6 +517,8 @@ error_e tag_process_init(void)
             partId = app.pConfig->s.partId;
         }
         pTagInfo->eui64     = ((uint64_t)lotId<<32) | partId;
+
+       diag_printf("Tag EUI-64: 0x%08X%08X\r\n",(unsigned int)lotId,(unsigned int)(partId & 0xFFFFFFFF));
     }
 
 
