@@ -1,0 +1,202 @@
+<!DOCTYPE CrossStudio_Project_File>
+<solution Name="twr_demo_nRF52840_uwb" target="8" version="2">
+  <project Name="twr_demo_nRF52840_uwb">
+    <configuration
+      Name="Common"
+      arm_architecture="v7EM"
+      arm_core_type="Cortex-M4"
+      arm_endian="Little"
+      arm_fp_abi="Hard"
+      arm_fpu_type="FPv4-SP-D16"
+      arm_linker_heap_size="8192"
+      arm_linker_process_stack_size="0"
+      arm_linker_stack_size="8192"
+      arm_linker_treat_warnings_as_errors="No"
+      arm_simulator_memory_simulation_parameter="RWX 00000000,00100000,FFFFFFFF;RWX 20000000,00010000,CDCDCDCD"
+      arm_target_device_name="nRF52840_xxAA"
+      arm_target_interface_type="SWD"
+      c_preprocessor_definitions="BOARD_CUSTOM;CONFIG_GPIO_AS_PINRESET;FLOAT_ABI_HARD;FREERTOS;INITIALIZE_USER_SECTIONS;NO_VTOR_CONFIG;NRF52840_XXAA;DEBUG;CFG_LE_TRILAT=1;CFG_LE_TRILAT_UTILS=1;TDOA_ANCHOR=1;UWB_BH_ENABLE;PDOA_NODE=1;PDOA_TAG=1"
+      c_user_include_directories="./config;../../SDK/components;../../SDK/components/boards;../../SDK/components/drivers_nrf/usbd;../../SDK/components/drivers_nrf/nrf_soc_nosd;../../SDK/components/libraries/atomic;../../SDK/components/libraries/atomic_fifo;../../SDK/components/libraries/balloc;../../SDK/components/libraries/bsp;../../SDK/components/libraries/delay;../../SDK/components/libraries/button;../../SDK/components/libraries/experimental_section_vars;../../SDK/components/libraries/log;../../SDK/components/libraries/log/src;../../SDK/components/libraries/memobj;../../SDK/components/libraries/ringbuf;../../SDK/components/libraries/strerror;../../SDK/components/libraries/fifo;../../SDK/components/libraries/timer;../../SDK/components/libraries/util;../../SDK/components/libraries/uart;../../SDK/components/toolchain/cmsis/include;../../SDK/components/libraries/usbd;../../SDK/components/libraries/usbd/config;../../SDK/components/libraries/usbd/class/cdc;../../SDK/components/libraries/usbd/class/cdc/acm;../../SDK/components/libraries/experimental_log;../../SDK/components/libraries/experimental_log/src;../../SDK/components/libraries/experimental_memobj;../../SDK/components/libraries/experimental_section_vars;../../SDK/components/toolchain/cmsis/include;../../SDK/external/fprintf;../../SDK/external/segger_rtt;../../SDK/external/freertos/config;../../SDK/external/freertos/portable/CMSIS/nrf52;../../SDK/external/freertos/portable/GCC/nrf52;../../SDK/external/freertos/source/include;../../SDK/external/utf_converter;../../SDK/integration/nrfx;../../SDK/integration/nrfx/legacy;../../SDK/modules/nrfx;../../SDK/modules/nrfx/drivers;../../SDK/modules/nrfx/drivers/include;../../SDK/modules/nrfx/hal;../../SDK/modules/nrfx/mdk;.;./Src;./Src/Inc;./drivers/dwt_uwb_driver/Inc;./Src/apps/node/node;./Src/apps/node/task_node;./Src/apps/tag/tag;./Src/apps/tag/task_tag;./Src/apps/tcfm/tcfm;./Src/apps/tcfm/task_tcfm;./Src/apps/tcwm/tcwm;./Src/apps/tcwm/task_tcwm;./Src/apps/usb2spi/usb2spi;./Src/apps/usb2spi/task_usb2spi;./Src/apps/listener/listener;./Src/apps/listener/task_listener;./Src/apps/trilat/dwm_le;./Src/config/config;./Src/config/default_config;./Src/core/command/cmd;./Src/core/command/cmd_fn;./Src/core/task_ctrl;./Src/core/task_flush;./Src/core/task_isr;./Src/core/usb_uart_rx;./Src/core/usb_uart_tx;./Src/platform_nrf52840/deca_phy;./Src/platform_nrf52840/deca_sleep;./Src/platform_nrf52840/deca_probe;./Src/platform_nrf52840/port;./Src/platform_nrf52840/vdsr;./Src/srv/crc16;./Src/srv/json;./Src/srv/common_n;./Src/srv/msg_time;./Src/srv/tag_list;./Src/srv/translate;./Src/srv/util;./Src/CMSIS_RTOS;../bsp"
+      debug_register_definition_file="../../SDK/modules/nrfx/mdk/nrf52840.svd"
+      debug_start_from_entry_point_symbol="No"
+      debug_target_connection="J-Link"
+      gcc_debugging_level="Level 3"
+      gcc_entry_point="Reset_Handler"
+      linker_additional_options="--whole-archive;drivers/dwt_uwb_driver/lib/libdwt_uwb_driver-m4-hfp-6.0.7.a;--no-whole-archive"
+      linker_output_format="hex"
+      linker_printf_fmt_level="long"
+      linker_printf_width_precision_supported="Yes"
+      linker_scanf_fmt_level="long"
+      linker_section_placement_file="flash_placement.xml"
+      linker_section_placement_macros="FLASH_PH_START=0x0;FLASH_PH_SIZE=0x100000;RAM_PH_START=0x20000000;RAM_PH_SIZE=0x40000;FLASH_START=0x0;FLASH_SIZE=0x100000;FCONFIG_START=0x11000;FCONFIG_SIZE=0x400;DEFAULT_CONFIG_START=0x10000;DEFAULT_CONFIG_SIZE=0x400;INIT_START=0x12000;RAM_START=0x20000000;RAM_SIZE=0x40000"
+      linker_section_placements_segments="FLASH RX 0x0 0x100000;RAM RWX 0x20000000 0x40000"
+      macros="CMSIS_CONFIG_TOOL=../../SDK/external_tools/cmsisconfig/CMSIS_Configuration_Wizard.jar"
+      project_directory=""
+      project_type="Executable" />
+    <folder Name="Segger Startup Files">
+      <file file_name="$(StudioDir)/source/thumb_crt0.s" />
+    </folder>
+    <folder Name="nRF_Log">
+      <file file_name="../../SDK/components/libraries/log/src/nrf_log_frontend.c" />
+      <file file_name="../../SDK/components/libraries/log/src/nrf_log_str_formatter.c" />
+      <file file_name="../../SDK/components/libraries/log/src/nrf_log_backend_rtt.c" />
+      <file file_name="../../SDK/components/libraries/log/src/nrf_log_backend_serial.c" />
+      <file file_name="../../SDK/components/libraries/log/src/nrf_log_backend_uart.c" />
+      <file file_name="../../SDK/components/libraries/log/src/nrf_log_default_backends.c" />
+    </folder>
+    <folder Name="Board Definition">
+      <file file_name="../../SDK/components/boards/boards.c" />
+    </folder>
+    <folder Name="Third Parties">
+      <file file_name="../../SDK/external/freertos/source/croutine.c" />
+      <file file_name="../../SDK/external/freertos/source/event_groups.c" />
+      <file file_name="../../SDK/external/freertos/source/list.c" />
+      <file file_name="../../SDK/external/freertos/portable/GCC/nrf52/port.c" />
+      <file file_name="../../SDK/external/freertos/portable/CMSIS/nrf52/port_cmsis.c" />
+      <file file_name="../../SDK/external/freertos/portable/CMSIS/nrf52/port_cmsis_systick.c" />
+      <file file_name="../../SDK/external/freertos/source/queue.c" />
+      <file file_name="../../SDK/external/freertos/source/stream_buffer.c" />
+      <file file_name="../../SDK/external/freertos/source/tasks.c" />
+      <file file_name="../../SDK/external/freertos/source/timers.c" />
+      <file file_name="../../SDK/external/freertos/source/portable/MemMang/heap_4.c" />
+    </folder>
+    <folder Name="nRF_Libraries">
+      <file file_name="../../SDK/components/libraries/button/app_button.c" />
+      <file file_name="../../SDK/components/libraries/util/app_error.c" />
+      <file file_name="../../SDK/components/libraries/util/app_error_handler_gcc.c" />
+      <file file_name="../../SDK/components/libraries/util/app_error_weak.c" />
+      <file file_name="../../SDK/components/libraries/timer/app_timer_freertos.c" />
+      <file file_name="../../SDK/components/libraries/util/app_util_platform.c" />
+      <file file_name="../../SDK/components/libraries/util/nrf_assert.c" />
+      <file file_name="../../SDK/components/libraries/atomic/nrf_atomic.c" />
+      <file file_name="../../SDK/components/libraries/balloc/nrf_balloc.c" />
+      <file file_name="../../SDK/external/fprintf/nrf_fprintf.c" />
+      <file file_name="../../SDK/external/fprintf/nrf_fprintf_format.c" />
+      <file file_name="../../SDK/components/libraries/memobj/nrf_memobj.c" />
+      <file file_name="../../SDK/components/libraries/ringbuf/nrf_ringbuf.c" />
+      <file file_name="../../SDK/components/libraries/strerror/nrf_strerror.c" />
+      <file file_name="../../SDK/components/libraries/uart/app_uart_fifo.c" />
+      <file file_name="../../SDK/components/libraries/fifo/app_fifo.c" />
+      <file file_name="../../SDK/components/libraries/usbd/app_usbd.c" />
+      <file file_name="../../SDK/components/libraries/usbd/app_usbd_core.c" />
+      <file file_name="../../SDK/components/libraries/usbd/app_usbd_serial_num.c" />
+      <file file_name="../../SDK/components/libraries/usbd/app_usbd_string_desc.c" />
+      <file file_name="../../SDK/components/libraries/usbd/class/cdc/acm/app_usbd_cdc_acm.c" />
+      <file file_name="../../SDK/external/utf_converter/utf.c" />
+    </folder>
+    <folder Name="nRF_Drivers">
+      <file file_name="../../SDK/integration/nrfx/legacy/nrf_drv_clock.c" />
+      <file file_name="../../SDK/components/drivers_nrf/nrf_soc_nosd/nrf_nvic.c" />
+      <file file_name="../../SDK/components/drivers_nrf/nrf_soc_nosd/nrf_soc.c" />
+      <file file_name="../../SDK/modules/nrfx/soc/nrfx_atomic.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_clock.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_gpiote.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_rtc.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_power.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_spim.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_systick.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_timer.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_twi.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_wdt.c" />
+      <file file_name="../../SDK/modules/nrfx/hal/nrf_nvmc.c" />
+      <file file_name="../../SDK/integration/nrfx/legacy/nrf_drv_spi.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_usbd.c" />
+      <file file_name="../../SDK/integration/nrfx/legacy/nrf_drv_power.c" />
+      <file file_name="../../SDK/integration/nrfx/legacy/nrf_drv_twi.c" />
+      <file file_name="../../SDK/integration/nrfx/legacy/nrf_drv_uart.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_uart.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_uarte.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/prs/nrfx_prs.c" />
+      <file file_name="../../SDK/modules/nrfx/drivers/src/nrfx_spi.c" />
+    </folder>
+    <folder Name="None">
+      <file file_name="../../SDK/modules/nrfx/mdk/ses_startup_nrf52840.s" />
+      <file file_name="../../SDK/modules/nrfx/mdk/ses_startup_nrf_common.s" />
+      <file file_name="../../SDK/modules/nrfx/mdk/system_nrf52840.c" />
+    </folder>
+    <folder Name="Src">
+      <file file_name="Src/dw_pdoa_node_common.c" />
+      <file file_name="Src/main.c" />
+      <folder Name="apps">
+        <folder Name="node">
+          <file file_name="Src/apps/node/node/node.c" />
+          <file file_name="Src/apps/node/task_node/task_node.c" />
+        </folder>
+        <folder Name="tag">
+          <file file_name="Src/apps/tag/tag/tag.c" />
+          <file file_name="Src/apps/tag/task_tag/task_tag.c" />
+        </folder>
+        <folder Name="tcfm">
+          <file file_name="Src/apps/tcfm/task_tcfm/task_tcfm.c" />
+          <file file_name="Src/apps/tcfm/tcfm/tcfm.c" />
+        </folder>
+        <folder Name="tcwm">
+          <file file_name="Src/apps/tcwm/tcwm/tcwm.c" />
+          <file file_name="Src/apps/tcwm/task_tcwm/task_tcwm.c" />
+        </folder>
+        <folder Name="usb2spi">
+          <file file_name="Src/apps/usb2spi/task_usb2spi/task_usb2spi.c" />
+          <file file_name="Src/apps/usb2spi/usb2spi/usb2spi.c" />
+        </folder>
+        <folder Name="trilat">
+          <folder Name="dwm_le">
+            <file file_name="Src/apps/trilat/dwm_le/le-trilat.c" />
+            <file file_name="Src/apps/trilat/dwm_le/dwm-math.c" />
+          </folder>
+          <folder Name="task_trilat">
+            <file file_name="Src/apps/trilat/task_trilat/task_trilat.c" />
+          </folder>
+        </folder>
+        <folder Name="listener">
+          <file file_name="Src/apps/listener/listener/listener.c" />
+          <file file_name="Src/apps/listener/task_listener/task_listener.c" />
+        </folder>
+      </folder>
+      <folder Name="config">
+        <file file_name="Src/config/config/config.c" />
+        <file file_name="Src/config/default_config/default_config.c" />
+        <file file_name="Src/config/config/config.h" />
+      </folder>
+      <folder Name="core">
+        <folder Name="command">
+          <file file_name="Src/core/command/cmd/cmd.c" />
+          <file file_name="Src/core/command/cmd_fn/cmd_fn.c" />
+        </folder>
+        <file file_name="Src/core/task_ctrl/task_ctrl.c" />
+        <file file_name="Src/core/task_flush/task_flush.c" />
+        <file file_name="Src/core/usb_uart_rx/usb_uart_rx.c" />
+        <file file_name="Src/core/usb_uart_tx/usb_uart_tx.c" />
+      </folder>
+      <folder Name="platform_nrf52840">
+        <file file_name="Src/platform_nrf52840/deca_sleep/deca_sleep.c" />
+        <file file_name="Src/platform_nrf52840/port/deca_usb.c" />
+        <file file_name="Src/platform_nrf52840/port/port_platform.c" />
+        <file file_name="Src/platform_nrf52840/port/deca_uart.c" />
+        <file file_name="Src/platform_nrf52840/deca_probe/deca_probe_interface.c" />
+      </folder>
+      <folder Name="srv">
+        <file file_name="Src/srv/crc16/crc16.c" />
+        <file file_name="Src/srv/json/cJSON.c" />
+        <file file_name="Src/srv/json/json_2pc.c" />
+        <file file_name="Src/srv/msg_time/msg_time.c" />
+        <file file_name="Src/srv/tag_list/tag_list.c" />
+        <file file_name="Src/srv/translate/translate.c" />
+        <file file_name="Src/srv/util/util.c" />
+        <folder Name="common_n">
+          <file file_name="Src/srv/common_n/common_n.c" />
+        </folder>
+      </folder>
+      <folder Name="CMSIS_RTOS">
+        <file file_name="Src/CMSIS_RTOS/cmsis_os.c" />
+      </folder>
+    </folder>
+  </project>
+  <configuration
+    Name="Release"
+    c_preprocessor_definitions="NDEBUG"
+    gcc_optimization_level="Level 1" />
+  <configuration
+    Name="Debug"
+    c_preprocessor_definitions="DEBUG; DEBUG_NRF"
+    gcc_optimization_level="Level 1" />
+</solution>
