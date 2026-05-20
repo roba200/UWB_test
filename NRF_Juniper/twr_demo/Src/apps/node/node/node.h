@@ -231,6 +231,7 @@ typedef struct node_info_s node_info_t;
 // exported functions prototypes
 //
 extern node_info_t * getNodeInfoPtr(void);
+extern void node_get_eui(uint8_t *buf);
 
 //-----------------------------------------------------------------------------
 // exported functions prototypes

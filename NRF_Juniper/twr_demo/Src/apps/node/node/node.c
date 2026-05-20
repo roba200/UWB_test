@@ -33,6 +33,7 @@
 #include "nrf_drv_rtc.h"
 #include "errno.h"
 #include "deca_device_api.h"
+#include "config.h"
 
 #include "assert.h"
 #include "deca_dbg.h"
@@ -93,6 +94,19 @@ extern void trilat_SF_cb(void);
 static void rtcWakeUpTimerEventCallback_node(void);
 static double pdoa2path_diff_ch5(float x);
 static double pdoa2path_diff_ch9(float x);
+static uint8_t s_node_eui[8] = {0};
+
+static void node_store_eui(uint32_t lotId, uint32_t partId)
+{
+    s_node_eui[0] = (uint8_t)(partId);
+    s_node_eui[1] = (uint8_t)(partId >> 8);
+    s_node_eui[2] = (uint8_t)(partId >> 16);
+    s_node_eui[3] = (uint8_t)(partId >> 24);
+    s_node_eui[4] = (uint8_t)(lotId);
+    s_node_eui[5] = (uint8_t)(lotId >> 8);
+    s_node_eui[6] = (uint8_t)(lotId >> 16);
+    s_node_eui[7] = (uint8_t)(lotId >> 24);
+}
 
 //-----------------------------------------------------------------------------
 // Implementation
@@ -1059,6 +1073,16 @@ error_e twr_responder_algorithm_rx(rx_pckt_t *pRxPckt, node_info_t *pNodeInfo)
 
 //-----------------------------------------------------------------------------
 
+void node_get_eui(uint8_t *buf)
+{
+    if (!buf)
+    {
+        return;
+    }
+
+    memcpy(buf, s_node_eui, 8);
+}
+
 
 //-----------------------------------------------------------------------------
 /*
@@ -1248,9 +1272,12 @@ error_e node_process_init()
             {
                 app.pConfig->s.lotId  = rand();
                 app.pConfig->s.partId = rand();
+                save_bssConfig(app.pConfig);
             }
+            lotId = app.pConfig->s.lotId;
             partId = app.pConfig->s.partId;
         }
+        node_store_eui(lotId, partId);
         pNodeInfo->eui16 = (uint16_t)(partId & 0xFFFF);
 
         //display the EUI-64 only

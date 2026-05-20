@@ -23,6 +23,9 @@
 #include "usb2spi.h"
 #include "cmd.h"
 #include "usb_uart_tx.h"
+#include "binary_uart_protocol.h"
+
+extern void send_to_host_eui_binary(void);
 
 /* For bare-metal implementation this critical defines may be required. */
 #define USB_UART_ENTER_CRITICAL()
@@ -54,6 +57,8 @@ usb_data_e waitForCommand(uint8_t *pBuf , uint16_t len, uint16_t *read_offset,ui
     usb_data_e      		ret=NO_DATA;
     static uint8_t  		cmdLen = 0;
     static uint8_t  		cmdBuf[MAX_CMD_LENGTH]; /* Commands buffer */
+    static uint8_t          binEuiBuf[BIN_EUI_FRAME_SIZE];
+    static uint8_t          binEuiLen = 0;
     uint16_t				cnt;
     static command_type_e	command_type=cmdUNKNOWN_TYPE;
     static uint8_t			brackets_cnt;
@@ -62,15 +67,36 @@ usb_data_e waitForCommand(uint8_t *pBuf , uint16_t len, uint16_t *read_offset,ui
 
     for (cnt=0;cnt<len;cnt++)//Loop over the buffer rx data
     {
-    	if (pBuf[*read_offset]== '\b') //erase of a char in the terminal
+        uint8_t rx = pBuf[*read_offset];
+
+        if ((binEuiLen > 0) ||
+            ((command_type == cmdUNKNOWN_TYPE) && (rx == BIN_EUI_REQ_FRAME_START)))
+        {
+            cmdLen = 0;
+            command_type = cmdUNKNOWN_TYPE;
+
+            binEuiBuf[binEuiLen++] = rx;
+            if (binEuiLen >= BIN_EUI_FRAME_SIZE)
+            {
+                if (binary_eui_validate_request_frame(binEuiBuf))
+                {
+                    send_to_host_eui_binary();
+                }
+                binEuiLen = 0;
+            }
+
+            *read_offset=(*read_offset+1)&cyclic_size;
+            continue;
+        }
+
+        if (rx == '\b') //erase of a char in the terminal
 		{
 			port_tx_msg((uint8_t*)"\b\x20\b",3);
 			if (cmdLen) cmdLen--;
 		}
 		else
 		{
-			port_tx_msg(&pBuf[*read_offset], 1);
-			if (pBuf[*read_offset] == '\n' || pBuf[*read_offset] == '\r')
+			if (rx == '\n' || rx == '\r')
 			{
 				if ((cmdLen!=0)&&(command_type==cmdREGULAR))//Checks if need to handle regular command
 				{//Need to update the app commands buffer
@@ -84,8 +110,8 @@ usb_data_e waitForCommand(uint8_t *pBuf , uint16_t len, uint16_t *read_offset,ui
 			}
 			else if (command_type==cmdUNKNOWN_TYPE)
 			{//Need to find out if getting regular command or JSON
-				cmdBuf[cmdLen]=pBuf[*read_offset];
-				if (pBuf[*read_offset]== '{')
+				cmdBuf[cmdLen]=rx;
+				if (rx == '{')
 				{//Start Json command
 					command_type=cmdJSON;
 					brackets_cnt=1;
@@ -98,18 +124,18 @@ usb_data_e waitForCommand(uint8_t *pBuf , uint16_t len, uint16_t *read_offset,ui
 			}
 			else if (command_type==cmdREGULAR)
 			{//Regular command
-				cmdBuf[cmdLen]=pBuf[*read_offset];
+				cmdBuf[cmdLen]=rx;
 				cmdLen++;
 			}
 			else
 			{//Json command
-				cmdBuf[cmdLen]=pBuf[*read_offset];
+				cmdBuf[cmdLen]=rx;
 				cmdLen++;
-				if (pBuf[*read_offset] == '{')
+				if (rx == '{')
 				{
 					brackets_cnt++;
 				}
-				else if (pBuf[*read_offset] == '}')
+				else if (rx == '}')
 				{
 					brackets_cnt--;
 					if (brackets_cnt==0)//Got a full Json command

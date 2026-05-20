@@ -48,7 +48,7 @@
 #define DEFAULT_ACCUM_READING       0       /**< */
 #define DEFAULT_DIAG_READING        0       /**< */
 #define DEFAULT_PHASECORR_EN        1       /**< enable antenna related phase correction polynomial */
-#define DEFAULT_REPORT_LEVEL        1       /**< what to use as output of TWR: 1:JSON, 2:Reduced, 3:Minimal */
+#define DEFAULT_REPORT_LEVEL        3       /**< what to use as output of TWR: 1:JSON, 2:Reduced, 3:Minimal */
 #define DEFAULT_DEBUG               0       /**< if 1, then the LED_RED used to show an error, if any */
 
 /* Slot configuration */
