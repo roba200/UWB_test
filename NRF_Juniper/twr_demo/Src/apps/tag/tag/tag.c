@@ -504,27 +504,32 @@ error_e tag_process_init(void)
 
 
     /* below valid after dwt_initialise() : OTP values */
-    {
-        uint32_t lotId = dwt_getlotid();
-        uint32_t partId = dwt_getpartid();
+    // {
+    //     uint32_t lotId = dwt_getlotid();
+    //     uint32_t partId = dwt_getpartid();
 
-        if((lotId | partId) == 0)
-        {
-            if((app.pConfig->s.partId | app.pConfig->s.lotId) == 0)
-            {
+    //     if((lotId | partId) == 0)
+    //     {
+    //         if((app.pConfig->s.partId | app.pConfig->s.lotId) == 0)
+    //         {
 
-                app.pConfig->s.lotId = rand();
-                app.pConfig->s.partId = rand();
-                save_bssConfig(app.pConfig);
-            }
+    //             app.pConfig->s.lotId = rand();
+    //             app.pConfig->s.partId = rand();
+    //             save_bssConfig(app.pConfig);
+    //         }
 
-            lotId = app.pConfig->s.lotId;
-            partId = app.pConfig->s.partId;
-        }
-        pTagInfo->eui64     = ((uint64_t)lotId<<32) | partId;
+    //         lotId = app.pConfig->s.lotId;
+    //         partId = app.pConfig->s.partId;
+    //     }
+    //     pTagInfo->eui64     = ((uint64_t)lotId<<32) | partId;
 
-       diag_printf("Tag EUI-64: 0x%08X%08X\r\n",(unsigned int)lotId,(unsigned int)(partId & 0xFFFFFFFF));
-    }
+    //    diag_printf("Tag EUI-64: 0x%08X%08X\r\n",(unsigned int)lotId,(unsigned int)(partId & 0xFFFFFFFF));
+    // }
+
+    uint8_t euiLong[8] = {0};
+    dwt_geteui(euiLong); //read EUI-64 from the chip (or from stored config if OTP is unprogrammed)
+    // memcpy(s_node_eui, euiLong, 8);
+    pTagInfo->eui64 = AR2U16(euiLong);
 
 
     /*
