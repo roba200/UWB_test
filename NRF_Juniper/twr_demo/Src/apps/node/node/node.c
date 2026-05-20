@@ -95,6 +95,7 @@ static void rtcWakeUpTimerEventCallback_node(void);
 static double pdoa2path_diff_ch5(float x);
 static double pdoa2path_diff_ch9(float x);
 static uint8_t s_node_eui[8] = {0};
+static uint16_t s_node_addr16 = 0;
 
 static void node_store_eui(uint32_t lotId, uint32_t partId)
 {
@@ -1083,6 +1084,11 @@ void node_get_eui(uint8_t *buf)
     memcpy(buf, s_node_eui, 8);
 }
 
+uint16_t node_get_addr16(void)
+{
+    return s_node_addr16;
+}
+
 
 //-----------------------------------------------------------------------------
 /*
@@ -1194,6 +1200,7 @@ error_e node_process_init()
     pNodeInfo->pSfConfig = &app.pConfig->s.sfConfig; /**< Super Frame configuration */
     pNodeInfo->panID     = app.pConfig->s.panID;     /**< panID    */
     pNodeInfo->eui16     = app.pConfig->s.addr;      /**< Node's address */
+    s_node_addr16        = pNodeInfo->eui16;
 
     { //calculate two-way ranging frame timings
         dwt_config_t *pCfg = &app.pConfig->dwt_config;  //dwt_config : holds node's UWB mode
@@ -1279,6 +1286,7 @@ error_e node_process_init()
         }
         node_store_eui(lotId, partId);
         pNodeInfo->eui16 = (uint16_t)(partId & 0xFFFF);
+        s_node_addr16 = pNodeInfo->eui16;
 
         //display the EUI-64 only
         diag_printf("Node EUI-64: 0x%08X%08X\r\n", (unsigned int)lotId, (unsigned int)(partId & 0xFFFFFFFF));

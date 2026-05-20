@@ -154,6 +154,34 @@ void send_to_pc_tag_location(twr_res_ext_t *p) {
   }
 }
 
+static void send_to_pc_twr_binary(result_t *pRes) {
+  uint8_t frame[BIN_FRAME_SIZE];
+  uint16_t anchor_id = node_get_addr16();
+  uint16_t distance_cm;
+
+  if (pRes->dist_cm < 0.0f) {
+    distance_cm = 0;
+  } else if (pRes->dist_cm > 65535.0f) {
+    distance_cm = 65535;
+  } else {
+    distance_cm = (uint16_t)(pRes->dist_cm + 0.5f);
+  }
+
+  frame[0] = BIN_FRAME_START;
+  frame[1] = (uint8_t)pRes->addr16;
+  frame[2] = (uint8_t)(pRes->addr16 >> 8);
+  frame[3] = (uint8_t)anchor_id;
+  frame[4] = (uint8_t)(anchor_id >> 8);
+  frame[5] = (uint8_t)distance_cm;
+  frame[6] = (uint8_t)(distance_cm >> 8);
+  frame[7] = (uint8_t)pRes->rangeNum;
+  frame[8] = (uint8_t)pRes->flag;
+  frame[9] = binary_twr_calc_checksum(&frame[1], 8);
+  frame[10] = BIN_FRAME_END;
+
+  port_tx_msg(frame, BIN_FRAME_SIZE);
+}
+
 /*
  * @brief This is a report of twr to pc
  *
@@ -180,29 +208,25 @@ void send_to_pc_tag_location(twr_res_ext_t *p) {
  * diag, acc,
  * */
 void send_to_pc_twr(result_t *pRes) {
+  if (app.pConfig->s.reportLevel == 3) {
+    send_to_pc_twr_binary(pRes);
+    return;
+  }
+
   char *str = CMD_MALLOC(MAX_STR_SIZE);
   int hlen;
 
   if (str) {
     if (app.pConfig->s.accEn == 1 || app.pConfig->s.diagEn == 1 ||
         app.pConfig->s.reportLevel > 1) {
-      if (app.pConfig->s.reportLevel == 3) {
-        /* shortest "AR" output: 18 chars per location: ~640 locations per
-         * second
-         * */
-        sprintf(str, "AR%04X%04X%08lX%08lX", (uint16_t)(pRes->addr16),
-                (uint16_t)(pRes->rangeNum), (long int)(pRes->x_cm),
-                (long int)(pRes->y_cm));
-      } else {
-        /* optimum "RA" output: 58 chars per location: ~200 locations per second
-         * */
-        sprintf(str, "RA%04X %04X %08lX %08lX %08lX %1X X:%04X Y:%04X Z:%04X",
-                (uint16_t)(pRes->addr16), (uint16_t)(pRes->rangeNum),
-                (long int)(pRes->x_cm), (long int)(pRes->y_cm),
-                (long int)(pRes->clockOffset_pphm), (uint8_t)(pRes->flag),
-                (uint16_t)(pRes->acc_x), (uint16_t)(pRes->acc_y),
-                (uint16_t)(pRes->acc_z));
-      }
+      /* optimum "RA" output: 58 chars per location: ~200 locations per second
+       * */
+      sprintf(str, "RA%04X %04X %08lX %08lX %08lX %1X X:%04X Y:%04X Z:%04X",
+              (uint16_t)(pRes->addr16), (uint16_t)(pRes->rangeNum),
+              (long int)(pRes->x_cm), (long int)(pRes->y_cm),
+              (long int)(pRes->clockOffset_pphm), (uint8_t)(pRes->flag),
+              (uint16_t)(pRes->acc_x), (uint16_t)(pRes->acc_y),
+              (uint16_t)(pRes->acc_z));
       sprintf(&str[strlen(str)], "\r\n");
       port_tx_msg((uint8_t *)str, strlen(str));
     } else if (app.pConfig->s.reportLevel == 1) {
