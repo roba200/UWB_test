@@ -2,10 +2,10 @@
  * binary_uart_protocol.h - Binary UART Protocol Definition
  * 
  * Custom binary payload format for high-speed TWR distance reporting
- * 11 bytes per message vs 110+ bytes for JSON
+ * 15 bytes per TWR message vs 110+ bytes for JSON
  * 
  * TWR frame format:
- * [0xAA][TAG_ID:2LE][ANCHOR_ID:2LE][DISTANCE:2LE][RANGE:1][FLAGS:1][CHK:1][0x55]
+ * [0xAA][TAG_ID:2LE][ANCHOR_ID:2LE][DISTANCE:2LE][RANGE:1][FLAGS:1][X_CM:2LE][Y_CM:2LE][CHK:1][0x55]
  *
  * New-tag frame format:
  * [0xAB][TAG_ADDR64:8LE][CHK:1][0x55]
@@ -32,7 +32,8 @@ extern "C" {
 #define BIN_EUI_REQ_FRAME_START 0xAC
 #define BIN_EUI_RESP_FRAME_START 0xAD
 #define BIN_FRAME_END           0x55
-#define BIN_FRAME_SIZE          11
+#define BIN_FRAME_SIZE          15
+#define BIN_TWR_PAYLOAD_SIZE    12
 #define BIN_NEWTAG_FRAME_SIZE   11
 #define BIN_EUI_FRAME_SIZE      11
 
@@ -43,7 +44,7 @@ extern "C" {
 #define BIN_FLAG_ESCORT     0x01    /* Bit 0: Escort mode active */
 
 /*
- * Binary TWR frame structure (packed, 11 bytes)
+ * Binary TWR frame structure (packed, 15 bytes)
  * All multi-byte values are little-endian
  */
 typedef struct {
@@ -53,8 +54,10 @@ typedef struct {
     uint16_t distance_cm;       /* [5-6] Distance in cm, 0-65535 (LE) */
     uint8_t  range_num;         /* [7] Range/sequence number */
     uint8_t  flags;             /* [8] Flags (bit 0: escort) */
-    uint8_t  checksum;          /* [9] XOR checksum of bytes 1-8 */
-    uint8_t  end;               /* [10] = 0x55 */
+    int16_t  x_cm;              /* [9-10] X coordinate in cm (LE) */
+    int16_t  y_cm;              /* [11-12] Y coordinate in cm (LE) */
+    uint8_t  checksum;          /* [13] XOR checksum of bytes 1-12 */
+    uint8_t  end;               /* [14] = 0x55 */
 } __attribute__((packed)) binary_twr_frame_t;
 
 /*
@@ -97,7 +100,7 @@ static inline uint8_t binary_twr_calc_checksum(const uint8_t *data, int len)
 
 /*
  * Validate received frame
- * @param frame: pointer to 11-byte frame buffer
+ * @param frame: pointer to 15-byte frame buffer
  * @return: 1 if valid, 0 if invalid
  */
 static inline int binary_twr_validate_frame(const uint8_t *frame)
@@ -105,13 +108,13 @@ static inline int binary_twr_validate_frame(const uint8_t *frame)
     uint8_t checksum;
     
     /* Check frame markers */
-    if (frame[0] != BIN_FRAME_START || frame[10] != BIN_FRAME_END) {
+    if (frame[0] != BIN_FRAME_START || frame[14] != BIN_FRAME_END) {
         return 0;
     }
     
-    /* Check checksum (bytes 1-8) */
-    checksum = binary_twr_calc_checksum(&frame[1], 8);
-    if (checksum != frame[9]) {
+    /* Check checksum (bytes 1-12) */
+    checksum = binary_twr_calc_checksum(&frame[1], BIN_TWR_PAYLOAD_SIZE);
+    if (checksum != frame[13]) {
         return 0;
     }
     
@@ -173,13 +176,17 @@ static inline void binary_twr_extract(const uint8_t *frame,
                                       uint16_t *anchor_id,
                                       uint16_t *distance_cm,
                                       uint8_t *range_num,
-                                      uint8_t *flags)
+                                      uint8_t *flags,
+                                      int16_t *x_cm,
+                                      int16_t *y_cm)
 {
     *tag_id     = frame[1] | (frame[2] << 8);
     *anchor_id  = frame[3] | (frame[4] << 8);
     *distance_cm = frame[5] | (frame[6] << 8);
     *range_num   = frame[7];
     *flags       = frame[8];
+    *x_cm        = (int16_t)(frame[9] | (frame[10] << 8));
+    *y_cm        = (int16_t)(frame[11] | (frame[12] << 8));
 }
 
 /*

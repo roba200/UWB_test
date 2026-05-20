@@ -158,6 +158,10 @@ static void send_to_pc_twr_binary(result_t *pRes) {
   uint8_t frame[BIN_FRAME_SIZE];
   uint16_t anchor_id = node_get_addr16();
   uint16_t distance_cm;
+  int16_t x_cm;
+  int16_t y_cm;
+  uint16_t x_raw;
+  uint16_t y_raw;
 
   if (pRes->dist_cm < 0.0f) {
     distance_cm = 0;
@@ -166,6 +170,24 @@ static void send_to_pc_twr_binary(result_t *pRes) {
   } else {
     distance_cm = (uint16_t)(pRes->dist_cm + 0.5f);
   }
+
+  if (pRes->x_cm < -32768.0f) {
+    x_cm = -32768;
+  } else if (pRes->x_cm > 32767.0f) {
+    x_cm = 32767;
+  } else {
+    x_cm = (int16_t)(pRes->x_cm + ((pRes->x_cm >= 0.0f) ? 0.5f : -0.5f));
+  }
+
+  if (pRes->y_cm < -32768.0f) {
+    y_cm = -32768;
+  } else if (pRes->y_cm > 32767.0f) {
+    y_cm = 32767;
+  } else {
+    y_cm = (int16_t)(pRes->y_cm + ((pRes->y_cm >= 0.0f) ? 0.5f : -0.5f));
+  }
+  x_raw = (uint16_t)x_cm;
+  y_raw = (uint16_t)y_cm;
 
   frame[0] = BIN_FRAME_START;
   frame[1] = (uint8_t)pRes->addr16;
@@ -176,8 +198,12 @@ static void send_to_pc_twr_binary(result_t *pRes) {
   frame[6] = (uint8_t)(distance_cm >> 8);
   frame[7] = (uint8_t)pRes->rangeNum;
   frame[8] = (uint8_t)pRes->flag;
-  frame[9] = binary_twr_calc_checksum(&frame[1], 8);
-  frame[10] = BIN_FRAME_END;
+  frame[9] = (uint8_t)x_raw;
+  frame[10] = (uint8_t)(x_raw >> 8);
+  frame[11] = (uint8_t)y_raw;
+  frame[12] = (uint8_t)(y_raw >> 8);
+  frame[13] = binary_twr_calc_checksum(&frame[1], BIN_TWR_PAYLOAD_SIZE);
+  frame[14] = BIN_FRAME_END;
 
   port_tx_msg(frame, BIN_FRAME_SIZE);
 }
