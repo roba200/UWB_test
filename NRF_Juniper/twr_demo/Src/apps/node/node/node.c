@@ -1269,28 +1269,33 @@ error_e node_process_init()
 
     /* Derive node short address from chip EUI-64 last 2 bytes (last 4 hex digits).
      * Falls back to stored config values if OTP is unprogrammed (ES0 silicon workaround). */
-    {
-        uint32_t lotId  = dwt_getlotid();
-        uint32_t partId = dwt_getpartid();
+    // {
+    //     uint32_t lotId  = dwt_getlotid();
+    //     uint32_t partId = dwt_getpartid();
 
-        if ((lotId | partId) == 0)
-        {
-            if ((app.pConfig->s.partId | app.pConfig->s.lotId) == 0)
-            {
-                app.pConfig->s.lotId  = rand();
-                app.pConfig->s.partId = rand();
-                save_bssConfig(app.pConfig);
-            }
-            lotId = app.pConfig->s.lotId;
-            partId = app.pConfig->s.partId;
-        }
-        node_store_eui(lotId, partId);
-        pNodeInfo->eui16 = (uint16_t)(partId & 0xFFFF);
-        s_node_addr16 = pNodeInfo->eui16;
+    //     if ((lotId | partId) == 0)
+    //     {
+    //         if ((app.pConfig->s.partId | app.pConfig->s.lotId) == 0)
+    //         {
+    //             app.pConfig->s.lotId  = rand();
+    //             app.pConfig->s.partId = rand();
+    //             save_bssConfig(app.pConfig);
+    //         }
+    //         lotId = app.pConfig->s.lotId;
+    //         partId = app.pConfig->s.partId;
+    //     }
+    //     node_store_eui(lotId, partId);
+    //     pNodeInfo->eui16 = (uint16_t)(partId & 0xFFFF);
+    //     s_node_addr16 = pNodeInfo->eui16;
 
-        //display the EUI-64 only
-        diag_printf("Node EUI-64: 0x%08X%08X\r\n", (unsigned int)lotId, (unsigned int)(partId & 0xFFFFFFFF));
-    }
+    //     //display the EUI-64 only
+    //     diag_printf("Node EUI-64: 0x%08X%08X\r\n", (unsigned int)lotId, (unsigned int)(partId & 0xFFFFFFFF));
+    // }
+
+    uint8_t euiLong[8] = {0};
+    dwt_geteui(euiLong); //read EUI-64 from the chip (or from stored config if OTP is unprogrammed)
+    memcpy(s_node_eui, euiLong, 8);
+    pNodeInfo->eui16 = AR2U16(euiLong);
 
     /* Configure DW IC's UWB mode, sets power and antenna delays for TWR mode */
     rxtx_configure_t p;
