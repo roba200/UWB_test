@@ -40,7 +40,7 @@
 #define DEFAULT_AUTOSTART_NONE      (0)
 #define DEFAULT_NODE_ADDR           0x0001  /**< Addr16    */
 #define DEFAULT_PANID               0xDECA  /**< PanID */
-#define DEFAULT_UART                0      /**< Use UART I/O instead of USB CDC */
+#define DEFAULT_UART                1      /**< Use UART I/O instead of USB CDC */
 #define DEFAULT_ANTD                (513.484f * 1e-9 / DWT_TIME_UNITS) /*Total antenna delay*/
 #define DEFAULT_PDOAOFF             0       /**< Phase Differences offset */
 #define DEFAULT_RNGOFF              0       /**< Ranging offset */

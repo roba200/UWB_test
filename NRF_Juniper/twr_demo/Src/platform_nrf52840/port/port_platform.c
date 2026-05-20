@@ -974,9 +974,7 @@ app_apptimer_start(void)
     }
 }
 
-#define BUTTON_TIME_TAG_MS (3000)
-
-#define DEFAULT_EVENT      (Ev_Stop_All)
+#define DEFAULT_EVENT      (APPLICATION_DEFAULT_EVENT)
 /*  The starting mode of the app can be chosen from:
  *  Ev_Node_Task
  *  Ev_Tag_Task
@@ -985,36 +983,11 @@ app_apptimer_start(void)
  */
 
 /* @brief
- *      no press: "default app": app, which was running on "SAVE" command
- *      if not set, then default is DEFAULT_EVENT
- *      pressed not more than 3 seconds: Tag
- *      pressed longer than 3 seconds: Node
+ *      start the build-time APPLICATION selection
  * */
 EventBits_t check_the_user_button(void)
 {
-    EventBits_t ret = DEFAULT_EVENT;
-
-    if(nrf_gpio_pin_read(BUTTON_1) == GPIO_PIN_SET)
-    {
-        if(app.pConfig->s.default_event != 0)
-        {
-            ret = app.pConfig->s.default_event;
-        }
-    }
-    else
-    {
-        uint32_t tmr;
-        start_timer(&tmr);
-        bool tmp = false;
-
-        while((nrf_gpio_pin_read(BUTTON_1) == GPIO_PIN_RESET) && !(tmp = check_timer(tmr, BUTTON_TIME_TAG_MS)))
-        {
-          nrf_drv_wdt_channel_feed(m_channel_id);
-        }
-
-        ret = (tmp)?(Ev_Node_Task):(Ev_Tag_Task);
-    }
-    return ret;
+    return DEFAULT_EVENT;
 }
 
 

@@ -50,6 +50,36 @@
      Ev_Stop_All         = 0x800000,
  };
 
+/* Build-time application selector.
+ * Set APPLICATION=NODE or APPLICATION=TAG in the project preprocessor definitions.
+ */
+#ifndef NODE
+#define NODE                1
+#endif
+#ifndef TAG
+#define TAG                 2
+#endif
+
+#ifndef APPLICATION
+#define APPLICATION         NODE
+#endif
+
+#if (APPLICATION == NODE)
+#define APPLICATION_DEFAULT_EVENT    Ev_Node_Task
+#elif (APPLICATION == TAG)
+#define APPLICATION_DEFAULT_EVENT    Ev_Tag_Task
+#else
+#error "APPLICATION must be set to NODE or TAG"
+#endif
+
+#ifndef AUTO_D2K_ON_TAG_FOUND
+#define AUTO_D2K_ON_TAG_FOUND        1
+#endif
+
+#define D2K_DEFAULT_FAST_MULT        1
+#define D2K_DEFAULT_SLOW_MULT        2
+#define D2K_DEFAULT_MODE             1
+
 /** 
   * @brief  GPIO Bit SET and Bit RESET enumeration 
   */

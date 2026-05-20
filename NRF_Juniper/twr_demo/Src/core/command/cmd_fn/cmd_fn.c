@@ -353,9 +353,9 @@ REG_FN(f_add_all_to_list)
         uint16_t        size = getDList_size();
 
         /* below can be removed if the d2k command, i.e. "add all discovered tags to known list automatically", is not used */
-        uint16_t    tag_mFast = 1;              /**< Used to pass a "moving" refresh rate to all tags in the "d2k" command */
-        uint16_t    tag_mSlow = 2;              /**< Used to pass a "stationary" refresh rate to all tags in the "d2k" command */
-        uint16_t    tag_Mode = 1;               /**< Used to pass a common "mode" parameter to all tags in the "d2k" command */
+        uint16_t    tag_mFast = D2K_DEFAULT_FAST_MULT; /**< Used to pass a "moving" refresh rate to all tags in the "d2k" command */
+        uint16_t    tag_mSlow = D2K_DEFAULT_SLOW_MULT; /**< Used to pass a "stationary" refresh rate to all tags in the "d2k" command */
+        uint16_t    tag_Mode = D2K_DEFAULT_MODE;       /**< Used to pass a common "mode" parameter to all tags in the "d2k" command */
 
         pAddr64 = getDList();
 

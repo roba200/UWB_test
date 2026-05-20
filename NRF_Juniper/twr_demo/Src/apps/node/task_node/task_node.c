@@ -321,12 +321,19 @@ static void RxTask(void const * arg)
                 {
                     signal_to_pc_new_tag_discovered(pNodeInfo->newTag_addr64);
 
-#undef DEBUG_NO_GUI
-#ifdef DEBUG_NO_GUI
-                    //this will add tag with assigning of automatic adresss if GUI application is not in use:
-                    //this guarantee the tag would have a unique address
-                    //do not use this when GUI is connected
-                    add_tag_to_knownTagList(pNodeInfo->newTag_addr64, (uint16_t)pNodeInfo->newTag_addr64 &0xFFFF, 1, 1, 1);
+#if (AUTO_D2K_ON_TAG_FOUND == 1)
+                    tag_addr_slot_t *tag;
+
+                    tag = add_tag_to_knownTagList(pNodeInfo->newTag_addr64,
+                                                  (uint16_t)pNodeInfo->newTag_addr64,
+                                                  D2K_DEFAULT_FAST_MULT,
+                                                  D2K_DEFAULT_SLOW_MULT,
+                                                  D2K_DEFAULT_MODE);
+                    if(tag)
+                    {
+                        tag->reqUpdatePending = 1;
+                    }
+                    initDList();
 #endif
 
                 }
