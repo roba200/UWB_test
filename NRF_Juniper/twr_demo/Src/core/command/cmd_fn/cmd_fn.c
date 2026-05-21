@@ -20,6 +20,7 @@
 #include "usb_uart_tx.h"
 #include "cmd.h"
 #include "deca_device_api.h"
+#include "node.h"
 
 #define CMD_COLUMN_WIDTH     10
 #define CMD_COLUMN_MAX       4
@@ -239,7 +240,13 @@ REG_FN(f_ant_rx_b)
 }
 REG_FN(f_pdoa_offset)
 {
+    CMD_ENTER_CRITICAL();
     pbss->s.pdoaOffset_deg = (int16_t)val;
+    if(app.mode == mPNODE)
+    {
+        node_apply_pdoa_offset_deg(pbss->s.pdoaOffset_deg);
+    }
+    CMD_EXIT_CRITICAL();
     return (CMD_FN_RET_OK);
 }
 REG_FN(f_rng_offset)
