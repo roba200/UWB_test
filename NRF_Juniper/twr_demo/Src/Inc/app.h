@@ -46,6 +46,7 @@
      Ev_Tcwm_Task        = 0x200,
      Ev_Usb2spi_Task     = 0x400,
      Ev_Listener_Task    = 0x800,
+     Ev_Sleep_Task       = 0x1000,
 	 //User-available max is 0x800000
      Ev_Stop_All         = 0x800000,
  };
@@ -117,6 +118,7 @@ typedef enum {
     mTCFM,      /**< Transmit Continuous Frame Mode mode */
     mLwipPerf,
     mLISTENER,  /**< Listener mode*/
+    mSLEEP,     /**< Low-power sleep mode: waiting for timeout or accelerometer motion IRQ */
     mMASK      = 0xFFFF
 }mode_e;
 
@@ -211,7 +213,7 @@ struct app_s
     task_signal_t    tcwmTask;          /* TCWM top-level application */
     task_signal_t    commTask;          /* Communicaiton top-level applicaiton */
 
-    task_signal_t    imuTask;           /* Tag/Node */
+    task_signal_t    imuTask;           /* Tag/Node: also used as the Sleep-Watch/motion-monitor task handle */
 
 
 

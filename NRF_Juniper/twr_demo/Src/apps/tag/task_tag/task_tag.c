@@ -10,14 +10,12 @@
  *            All rights reserved.
  *
  */
-
 #include "task_tag.h"
 #include "util.h"
 #include "app.h"
 #include "port.h"
 #include "tag.h"
-
-
+#include "task_sleep.h"
 //-----------------------------------------------------------------------------
 
 #define BLINK_PERIOD_MS            (500)    /* range init phase - Blink send period, ms */
@@ -334,6 +332,13 @@ void tag_helper(void const *argument)
     tag_process_start();
 
     taskEXIT_CRITICAL();    /**< all RTOS tasks can be scheduled */
+
+    /* Auto re-arm the inactivity watch (if configured) every time TAG starts -
+     * covers boot, an explicit TAG command, and resuming after a motion wake. */
+    if (app.pConfig->s.inactivityTimeout_sec > 0)
+    {
+        sleep_watch_start();
+    }
 }
 
 

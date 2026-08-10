@@ -50,6 +50,7 @@
 #define DEFAULT_PHASECORR_EN        1       /**< enable antenna related phase correction polynomial */
 #define DEFAULT_REPORT_LEVEL        3       /**< what to use as output of TWR: 1:JSON, 2:Reduced, 3:Minimal */
 #define DEFAULT_DEBUG               0       /**< if 1, then the LED_RED used to show an error, if any */
+#define DEFAULT_INACTIVITY_TIMEOUT_SEC  0   /**< SLEEP command: seconds of no motion before auto-sleep. 0 = disabled */
 
 /* Slot configuration */
 #define DEFAULT_SLOT_PERIOD_MS      5       /**< Slot period (ms), the best of what the implementation can achieve */
@@ -164,6 +165,7 @@
     .s.phaseCorrEn          = DEFAULT_PHASECORR_EN, \
     .s.reportLevel          = DEFAULT_REPORT_LEVEL, \
     .s.faultyRanges         = 5,\
+    .s.inactivityTimeout_sec = DEFAULT_INACTIVITY_TIMEOUT_SEC, \
     .s.debugEn              = DEFAULT_DEBUG, \
     .s.rcDelay_us           = DEFAULT_TAG_BLINK_TX_RC_RX_US, \
     .s.rcRxTo_us            = DEFAULT_TAG_RC_RX_TIMEOUT_US,\
@@ -219,6 +221,7 @@ struct run_s
     uint8_t     reportLevel;    /**< 0 - no output, 1-JSON, 2-limited */
     uint8_t     faultyRanges;   /**< Tag config: number of faulty ranges after that Tag return back to a Discovery phase */
     uint8_t     debugEn;        /**< Enable Red "error" Led and error_handler() */
+    uint16_t    inactivityTimeout_sec; /**< SLEEP command: seconds of no motion before auto-sleep. 0 = disabled */
     uint32_t    rcDelay_us;     /**< Node&Tag delay between end reception of UWB blink and start transmission of UWB Ranging Config message */
     uint16_t    rcRxTo_us;      /**< Tag's Receiver timeout only to save power on non-reception of the Ranging Config */
 

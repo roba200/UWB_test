@@ -43,6 +43,17 @@ extern "C" {
 #define DW3000_RTS_PIN_NUM      UART_PIN_DISCONNECTED
 #define DW3000_CTS_PIN_NUM      UART_PIN_DISCONNECTED
 
+// LIS2DW12 accelerometer (4-wire SPI, separate SPI instance from the DW3000)
+#define LIS2DW12_SCL_Pin     NRF_GPIO_PIN_MAP(0, 19)   /* SPC */
+#define LIS2DW12_CS_Pin      NRF_GPIO_PIN_MAP(1, 3)
+#define LIS2DW12_SDO_Pin     NRF_GPIO_PIN_MAP(1, 0)     /* MISO / SA0 */
+#define LIS2DW12_SDI_Pin     NRF_GPIO_PIN_MAP(0, 22)    /* MOSI */
+#define LIS2DW12_INT1_Pin    NRF_GPIO_PIN_MAP(1, 1)     /* Wake-Up-on-motion interrupt */
+#define LIS2DW12_INT2_Pin    NRF_GPIO_PIN_MAP(1, 4)     /* unused, reserved */
+
+// GPIO pulsed to signal the host processor that the module has woken up
+#define HOST_WAKEUP_Pin      NRF_GPIO_PIN_MAP(0, 27)
+
 #ifdef __cplusplus
 }
 #endif

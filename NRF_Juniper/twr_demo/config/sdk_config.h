@@ -3127,7 +3127,7 @@
 #endif
 
 // <q> NRFX_RTC2_ENABLED  - Enable RTC2 instance
- 
+
 
 #ifndef NRFX_RTC2_ENABLED
 #define NRFX_RTC2_ENABLED 0
@@ -5252,7 +5252,7 @@
 #endif
 
 // <q> RTC2_ENABLED  - Enable RTC2 instance
- 
+
 
 #ifndef RTC2_ENABLED
 #define RTC2_ENABLED 0

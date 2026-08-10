@@ -59,6 +59,8 @@ void deca_usb_init(void);
 extern void trilat_terminate();
 extern void listener_terminate();
 extern void listener_helper();
+extern void sleep_terminate();
+extern void sleep_helper();
 
 /**
  * @brief Function for application main entry.
@@ -173,7 +175,8 @@ int main(void)
 void StartDefaultTask(void const * argument)
 {
     const EventBits_t bitsWaitForAny = (Ev_Node_Task | Ev_Tag_Task | Ev_Trilat_N_Task |
-                                        Ev_Usb2spi_Task | Ev_Tcwm_Task | Ev_Tcfm_Task | Ev_Listener_Task | Ev_Stop_All);
+                                        Ev_Usb2spi_Task | Ev_Tcwm_Task | Ev_Tcfm_Task | Ev_Listener_Task |
+                                        Ev_Sleep_Task | Ev_Stop_All);
 
     EventBits_t    uxBits;
 
@@ -214,6 +217,7 @@ void StartDefaultTask(void const * argument)
           tcwm_terminate();
           trilat_terminate();
           listener_terminate();
+          sleep_terminate();
 
           FlushTask_reset();
 
@@ -239,6 +243,11 @@ void StartDefaultTask(void const * argument)
       case Ev_Listener_Task:
           app.mode = mLISTENER;
           listener_helper(NULL); /* call Listener helper function which will setup sub-tasks for Listener process */
+          break;
+
+      case Ev_Sleep_Task:
+          app.mode = mSLEEP;
+          sleep_helper(NULL); /* call Sleep helper function which will start the motion/timeout wait task */
           break;
 
 #if (PDOA_TAG == 1)

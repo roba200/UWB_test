@@ -82,7 +82,9 @@ enum Priorities {
 
     PRIO_TcfmTask           = osPriorityNormal,
     PRIO_TcwmTask           = osPriorityNormal,
-    PRIO_Usb2SpiTask        = osPriorityNormal
+    PRIO_Usb2SpiTask        = osPriorityNormal,
+
+    PRIO_ImuTask            = osPriorityBelowNormal /* Sleep/motion-monitor task: low priority background wait */
 
 };
 

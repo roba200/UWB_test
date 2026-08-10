@@ -18,6 +18,7 @@
 #include "deca_dbg.h"
 #include "port.h"
 #include "usb_uart_tx.h"
+#include "task_sleep.h"
 #include "cmd.h"
 #include "deca_device_api.h"
 #include "node.h"
@@ -172,6 +173,38 @@ REG_FN(f_stop)
     FlushTask_reset();
     port_tx_msg((uint8_t*)"\r\n",2);
     xEventGroupSetBits(app.xStartTaskEvent, Ev_Stop_All);
+    return (CMD_FN_RET_OK);
+}
+
+/**
+ * @brief   Configures the inactivity threshold: TAG ranging continues
+ *          normally, and the module only enters low-power sleep after <val>
+ *          seconds pass with no motion at all. Once asleep, motion is the
+ *          only wake source (no timeout wake). After waking, ranging resumes
+ *          and the same threshold automatically re-arms - no need to resend
+ *          this command after every wake. This is a persisted runtime
+ *          config value (like ADDR/PANID); use SAVE to keep it across reboots.
+ *          Usage: "sleep <inactivity_sec>", 0 = disable the feature.
+ * */
+REG_FN(f_sleep)
+{
+    pbss->s.inactivityTimeout_sec = (uint16_t)((val < 0) ? 0 : val);
+
+    if (app.mode == mPTAG)
+    {
+        /* TAG is already ranging: (re)arm the watch immediately so the new
+         * value takes effect right away instead of waiting for the next
+         * TAG (re)start. */
+        if (pbss->s.inactivityTimeout_sec > 0)
+        {
+            sleep_watch_start();
+        }
+        else
+        {
+            sleep_watch_stop();
+        }
+    }
+
     return (CMD_FN_RET_OK);
 }
 
@@ -1483,6 +1516,7 @@ const char COMMENT_P2FDEL          []={"Time, \'us\',  when Tag shall transmit F
 const char COMMENT_STOP            []={"Stops running any top-level applications"};
 const char COMMENT_STAT            []={"Displays the Status information"};
 const char COMMENT_SAVE            []={"Saves the configuration to the NVM"};
+const char COMMENT_SLEEP           []={"Sets the inactivity threshold: TAG ranging continues normally, and the module only enters low-power sleep after <inactivity_sec> seconds pass with no motion. Once asleep, motion is the only wake source (no timeout wake); on wake it pulses HOST_WAKEUP_Pin, resumes ranging, and automatically re-arms the same threshold.\r\nUsage: \"sleep <inactivity_sec>\", 0 = disable."};
 const char COMMENT_DECAJUNIPER     []={"This command reports the running application and the version information"};
 const char COMMENT_HELP            []={"This command displays the help information. Usage: \"help\" or \"help <CMD>\", <CMD> is the command from the list, i.e. \"help tag\"."};
 
@@ -1552,6 +1586,7 @@ const struct command_s known_commands []= {
     {"STOP",    mCmdGrp1 | mANY,   f_stop,                  COMMENT_STOP },
     {"STAT",    mCmdGrp1 | mANY,   f_stat,                  COMMENT_STAT },
     {"SAVE",    mCmdGrp1 | mANY,   f_save,                  COMMENT_SAVE },
+    {"SLEEP",   mCmdGrp1 | mANY,   f_sleep,                 COMMENT_SLEEP },
     {"DECA$",   mCmdGrp1 | mANY,   f_decaJuniper,           COMMENT_DECAJUNIPER },
     {"HELP",    mCmdGrp1 | mANY,   f_help_app,              COMMENT_HELP },
     {"?",       mCmdGrp1 | mANY,   f_help_app,              COMMENT_HELP },
