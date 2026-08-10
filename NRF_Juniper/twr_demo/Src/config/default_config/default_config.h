@@ -50,7 +50,7 @@
 #define DEFAULT_PHASECORR_EN        1       /**< enable antenna related phase correction polynomial */
 #define DEFAULT_REPORT_LEVEL        3       /**< what to use as output of TWR: 1:JSON, 2:Reduced, 3:Minimal */
 #define DEFAULT_DEBUG               0       /**< if 1, then the LED_RED used to show an error, if any */
-#define DEFAULT_INACTIVITY_TIMEOUT_SEC  0   /**< SLEEP command: seconds of no motion before auto-sleep. 0 = disabled */
+#define DEFAULT_INACTIVITY_TIMEOUT_SEC  60  /**< SLEEP command: seconds of no motion before auto-sleep. 0 = disabled */
 
 /* Slot configuration */
 #define DEFAULT_SLOT_PERIOD_MS      5       /**< Slot period (ms), the best of what the implementation can achieve */

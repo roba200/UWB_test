@@ -125,9 +125,58 @@ error_e send_to_pc_listener_info(uint8_t *data, uint8_t size, uint8_t *ts,
  *   Ycm  : Y distance received from node (cm)
  *   O    : clock offset (hundredths of ppm)
  */
+static void send_to_pc_tag_location_binary(twr_res_ext_t *p) {
+  uint8_t frame[BIN_TAG_LOC_FRAME_SIZE];
+  uint16_t x_raw = (uint16_t)p->x_cm;
+  uint16_t y_raw = (uint16_t)p->y_cm;
+  uint16_t clk_raw = (uint16_t)p->clkOffset_pphm;
+
+  frame[0] = BIN_TAG_LOC_FRAME_START;
+  frame[1] = (uint8_t)p->addr;
+  frame[2] = (uint8_t)(p->addr >> 8);
+  frame[3] = (uint8_t)p->node_addr;
+  frame[4] = (uint8_t)(p->node_addr >> 8);
+  frame[5] = (uint8_t)p->rNum;
+  frame[6] = (uint8_t)x_raw;
+  frame[7] = (uint8_t)(x_raw >> 8);
+  frame[8] = (uint8_t)y_raw;
+  frame[9] = (uint8_t)(y_raw >> 8);
+  frame[10] = (uint8_t)clk_raw;
+  frame[11] = (uint8_t)(clk_raw >> 8);
+  frame[12] = binary_twr_calc_checksum(&frame[1], BIN_TAG_LOC_PAYLOAD_SIZE);
+  frame[13] = BIN_FRAME_END;
+
+  port_tx_msg(frame, BIN_TAG_LOC_FRAME_SIZE);
+}
+
+/*
+ * @brief This is a report of the Tag's own location to the PC.
+ *
+ * There are two modes of operation: JSON(long output, reportLevel 1/2) or
+ * binary(short output, reportLevel 3 - see binary_uart_protocol.h,
+ * BIN_TAG_LOC_FRAME_START).
+ *
+ * JSON:
+ *  'JSxxxx{"TAG":
+ *    {     "a16":%04X, //this Tag's addr16
+ *          "N":%04X,   //reporting Node's addr16
+ *          "R":%d,     //range num
+ *          "Xcm":%d,   //X, cm
+ *          "Ycm":%d,   //Y, cm
+ *          "O":%d      //clock offset in hundredths part of ppm
+ *    }
+ *   }'
+ * */
 void send_to_pc_tag_location(twr_res_ext_t *p) {
-  char *str = CMD_MALLOC(MAX_STR_SIZE);
+  char *str;
   int hlen;
+
+  if (app.pConfig->s.reportLevel == 3) {
+    send_to_pc_tag_location_binary(p);
+    return;
+  }
+
+  str = CMD_MALLOC(MAX_STR_SIZE);
 
   if (str) {
     hlen = sprintf(str, "JS%04X", 0x5A5A);
