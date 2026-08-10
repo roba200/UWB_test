@@ -204,22 +204,20 @@ void send_to_pc_tag_location(twr_res_ext_t *p) {
 }
 
 static void send_to_pc_twr_binary(result_t *pRes) {
-  uint8_t frame[BIN_EXT_FRAME_SIZE];
+  uint8_t frame[BIN_FRAME_SIZE];
   uint16_t anchor_id = node_get_addr16();
-  uint32_t distance_mm;
+  uint16_t distance_cm;
   int16_t x_cm;
   int16_t y_cm;
   uint16_t x_raw;
   uint16_t y_raw;
-  uint16_t flags_raw;
-  int16_t pdoa_cdeg;
 
   if (pRes->dist_cm < 0.0f) {
-    distance_mm = 0;
-  } else if (pRes->dist_cm > 429496729.0f) {
-    distance_mm = 0xFFFFFFFFUL;
+    distance_cm = 0;
+  } else if (pRes->dist_cm > 65535.0f) {
+    distance_cm = 65535;
   } else {
-    distance_mm = (uint32_t)(pRes->dist_cm * 10.0f + 0.5f);
+    distance_cm = (uint16_t)(pRes->dist_cm + 0.5f);
   }
 
   if (pRes->x_cm < -32768.0f) {
@@ -239,39 +237,24 @@ static void send_to_pc_twr_binary(result_t *pRes) {
   }
   x_raw = (uint16_t)x_cm;
   y_raw = (uint16_t)y_cm;
-  flags_raw = (uint16_t)pRes->flag;
 
-  if (pRes->pdoa_raw_deg < -327.68f) {
-    pdoa_cdeg = -32768;
-  } else if (pRes->pdoa_raw_deg > 327.67f) {
-    pdoa_cdeg = 32767;
-  } else {
-    pdoa_cdeg = (int16_t)(pRes->pdoa_raw_deg * 100.0f +
-                          ((pRes->pdoa_raw_deg >= 0.0f) ? 0.5f : -0.5f));
-  }
-
-  frame[0] = BIN_EXT_FRAME_START;
+  frame[0] = BIN_FRAME_START;
   frame[1] = (uint8_t)pRes->addr16;
   frame[2] = (uint8_t)(pRes->addr16 >> 8);
   frame[3] = (uint8_t)anchor_id;
   frame[4] = (uint8_t)(anchor_id >> 8);
-  frame[5] = (uint8_t)distance_mm;
-  frame[6] = (uint8_t)(distance_mm >> 8);
-  frame[7] = (uint8_t)(distance_mm >> 16);
-  frame[8] = (uint8_t)(distance_mm >> 24);
-  frame[9] = (uint8_t)pRes->rangeNum;
-  frame[10] = (uint8_t)flags_raw;
-  frame[11] = (uint8_t)(flags_raw >> 8);
-  frame[12] = (uint8_t)x_raw;
-  frame[13] = (uint8_t)(x_raw >> 8);
-  frame[14] = (uint8_t)y_raw;
-  frame[15] = (uint8_t)(y_raw >> 8);
-  frame[16] = (uint8_t)((uint16_t)pdoa_cdeg);
-  frame[17] = (uint8_t)(((uint16_t)pdoa_cdeg) >> 8);
-  frame[18] = binary_twr_calc_checksum(&frame[1], BIN_EXT_TWR_PAYLOAD_SIZE);
-  frame[19] = BIN_FRAME_END;
+  frame[5] = (uint8_t)distance_cm;
+  frame[6] = (uint8_t)(distance_cm >> 8);
+  frame[7] = (uint8_t)pRes->rangeNum;
+  frame[8] = (uint8_t)pRes->flag;
+  frame[9] = (uint8_t)x_raw;
+  frame[10] = (uint8_t)(x_raw >> 8);
+  frame[11] = (uint8_t)y_raw;
+  frame[12] = (uint8_t)(y_raw >> 8);
+  frame[13] = binary_twr_calc_checksum(&frame[1], BIN_TWR_PAYLOAD_SIZE);
+  frame[14] = BIN_FRAME_END;
 
-  port_tx_msg(frame, BIN_EXT_FRAME_SIZE);
+  port_tx_msg(frame, BIN_FRAME_SIZE);
 }
 
 /*

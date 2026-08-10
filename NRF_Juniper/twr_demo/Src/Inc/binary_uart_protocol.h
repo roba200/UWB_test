@@ -4,11 +4,8 @@
  * Custom binary payload format for high-speed TWR distance reporting
  * 15 bytes per TWR message vs 110+ bytes for JSON
  * 
- * Legacy TWR frame format:
+ * TWR frame format:
  * [0xAA][TAG_ID:2LE][ANCHOR_ID:2LE][DISTANCE:2LE][RANGE:1][FLAGS:1][X_CM:2LE][Y_CM:2LE][CHK:1][0x55]
- *
- * Extended TWR frame format:
- * [0xAE][TAG_ID:2LE][ANCHOR_ID:2LE][DIST_MM:4LE][RANGE:1][FLAGS16:2LE][X_CM:2LE][Y_CM:2LE][PDOA_CDEG:2LE][CHK:1][0x55]
  *
  * New-tag frame format:
  * [0xAB][TAG_ADDR64:8LE][CHK:1][0x55]
@@ -34,7 +31,6 @@ extern "C" {
 
 /* Frame markers */
 #define BIN_FRAME_START         0xAA
-#define BIN_EXT_FRAME_START     0xAE
 #define BIN_NEWTAG_FRAME_START  0xAB
 #define BIN_EUI_REQ_FRAME_START 0xAC
 #define BIN_EUI_RESP_FRAME_START 0xAD
@@ -42,8 +38,6 @@ extern "C" {
 #define BIN_FRAME_END           0x55
 #define BIN_FRAME_SIZE          15
 #define BIN_TWR_PAYLOAD_SIZE    12
-#define BIN_EXT_FRAME_SIZE      20
-#define BIN_EXT_TWR_PAYLOAD_SIZE 17
 #define BIN_NEWTAG_FRAME_SIZE   11
 #define BIN_EUI_FRAME_SIZE      11
 #define BIN_TAG_LOC_FRAME_SIZE     14
@@ -71,20 +65,6 @@ typedef struct {
     uint8_t  checksum;          /* [13] XOR checksum of bytes 1-12 */
     uint8_t  end;               /* [14] = 0x55 */
 } __attribute__((packed)) binary_twr_frame_t;
-
-typedef struct {
-    uint8_t  start;             /* [0] = 0xAE */
-    uint16_t tag_id;            /* [1-2] 16-bit tag short address (LE) */
-    uint16_t anchor_id;         /* [3-4] 16-bit anchor short address (LE) */
-    uint32_t distance_mm;       /* [5-8] Distance in mm (LE) */
-    uint8_t  range_num;         /* [9] Range/sequence number */
-    uint16_t flags;             /* [10-11] service flags including zero-offset bits */
-    int16_t  x_cm;              /* [12-13] X coordinate in cm (LE) */
-    int16_t  y_cm;              /* [14-15] Y coordinate in cm (LE) */
-    int16_t  pdoa_cdeg;         /* [16-17] PDOA in centi-degrees (LE) */
-    uint8_t  checksum;          /* [18] XOR checksum of bytes 1-17 */
-    uint8_t  end;               /* [19] = 0x55 */
-} __attribute__((packed)) binary_ext_twr_frame_t;
 
 /*
  * Binary new-tag frame structure (packed, 11 bytes)

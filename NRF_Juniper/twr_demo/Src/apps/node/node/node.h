@@ -249,7 +249,6 @@ void    node_process_terminate(void);
 
 error_e tof2range(param_block_t*, float*, int32_t);
 void    pdoa2XY(result_t *, uint8_t);
-void    node_apply_pdoa_offset_deg(int16_t pdoa_offset_deg);
 
 //-----------------------------------------------------------------------------
 

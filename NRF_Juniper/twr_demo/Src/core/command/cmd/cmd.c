@@ -113,14 +113,6 @@ void command_parser(char *text)
         	sscanf(text,"%9s %d", cmd,&val);
         }
 
-        for (char *p = cmd; *p; ++p)
-        {
-            if (*p >= 'a' && *p <= 'z')
-            {
-                *p = (char)(*p - ('a' - 'A'));
-            }
-        }
-
         while (known_commands[cnt].cmnt != NULL)
         {
             if (strcmp(cmd, known_commands[cnt].name) == 0 )
