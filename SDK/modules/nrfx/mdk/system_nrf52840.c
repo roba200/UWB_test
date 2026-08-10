@@ -131,10 +131,15 @@ void SystemInit(void)
     }
     
     /* Workaround for Errata 136 "System: Bits in RESETREAS are set when they should not be" found at the Errata document
-       for your device located at https://infocenter.nordicsemi.com/index.jsp  */
+       for your device located at https://infocenter.nordicsemi.com/index.jsp
+       Modified from Nordic's stock workaround to also preserve the OFF bit
+       (needed by application code to detect a System-OFF/GPIO-SENSE wake) -
+       stock behaviour clears every bit except RESETPIN whenever RESETPIN is
+       set, which was silently destroying OFF on every motion-triggered wake
+       before main() ever got to read it. */
     if (errata_136()){
         if (NRF_POWER->RESETREAS & POWER_RESETREAS_RESETPIN_Msk){
-            NRF_POWER->RESETREAS =  ~POWER_RESETREAS_RESETPIN_Msk;
+            NRF_POWER->RESETREAS =  ~(POWER_RESETREAS_RESETPIN_Msk | POWER_RESETREAS_OFF_Msk);
         }
     }
     

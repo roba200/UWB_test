@@ -1,10 +1,9 @@
 /**
  * @file      task_sleep.c
- * @brief     Inactivity-triggered low-power sleep with motion-only wake-up.
+ * @brief     Inactivity-triggered real System OFF sleep with motion-only wake.
  *
- *            Two phases, both using app.imuTask as the task handle (they never
- *            run at the same time - Phase 1 only while TAG is ranging, Phase 2
- *            only after TAG has been torn down):
+ *            Two phases, using app.imuTask as the Phase 1 task handle (Phase 2
+ *            has no task at all - see below):
  *
  *            Phase 1 - WATCH (WatchTask, sleep_watch_start()/stop()):
  *              Runs alongside normal TAG ranging whenever
@@ -15,21 +14,28 @@
  *              (sustained inactivity), it fires Ev_Sleep_Task to hand off to
  *              Phase 2. Started automatically every time TAG (re)starts - see
  *              the hook at the end of tag_helper() in task_tag.c - which is
- *              what gives the "auto re-arm after wake" behaviour for free.
+ *              what gives the "auto re-arm after wake" behaviour for free,
+ *              including after a motion wake (see Phase 2).
  *
- *            Phase 2 - SLEEP (ImuTask, sleep_helper()):
+ *            Phase 2 - SLEEP (sleep_helper(), no task, no FreeRTOS involved):
  *              Entered via Ev_Sleep_Task, which runs through main.c's normal
  *              teardown path first (tag_terminate() etc., already resets the
  *              DW3000 into its low-current state). Arms the LIS2DW12's INT1
- *              wake-up-on-motion interrupt and blocks indefinitely - motion is
- *              the only way out, there is no timeout wake in this phase. On
- *              wake it pulses HOST_WAKEUP_Pin, reports over UART, and resumes
- *              TAG ranging by re-setting Ev_Tag_Task.
+ *              pin as a GPIO SENSE wake source, closes the UART
+ *              (deca_uart_close()), and calls nrf_power_system_off() - this
+ *              halts the CPU and never returns. The chip is now genuinely
+ *              powered down (~1-3 uA); the only way out is motion asserting
+ *              INT1, which causes a full chip RESET (not a resume - all RAM
+ *              state is lost). main.c detects this wake reason via
+ *              NRF_POWER->RESETREAS and pulses HOST_WAKEUP_Pin as the very
+ *              first thing on boot, before the normal boot sequence (which
+ *              lands back in TAG mode and re-arms Phase 1) continues.
  *
  *            Both phases explicitly flush the LIS2DW12's wake-up interrupt
- *            (it is latched until WAKE_UP_SRC is read) before relying on it,
- *            otherwise a stale/latched condition from setup can look like an
- *            immediate false wake.
+ *            (it is latched until WAKE_UP_SRC is read) before relying on it -
+ *            for Phase 2 this matters even more than it did for the old
+ *            GPIOTE-interrupt design, since GPIO SENSE wakes immediately if
+ *            the pin is already at the sensed level when armed.
  *
  * @attention Copyright 2019-2020 (c) Decawave Ltd, Dublin, Ireland.
  *            All rights reserved.
@@ -42,7 +48,8 @@
 #include "lis2dw12_platform.h"
 #include "lis2dw12_reg.h"
 #include "nrf_delay.h"
-#include "usb_uart_tx.h"
+#include "nrf_gpio.h"
+#include "nrf_power.h"
 
 /* How often Phase 1 polls the accelerometer for motion while TAG is ranging. */
 #define WATCH_POLL_MS   1000
@@ -50,19 +57,6 @@
 static stmdev_ctx_t gImuCtx;
 static uint8_t      gImuConfigured;
 static uint8_t      gImuFound;
-static uint8_t      gInt1GpioteReady;
-
-/* @brief Phase 2 only: LIS2DW12 INT1 GPIOTE ISR - motion detected while asleep. */
-static void sleep_int1_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
-{
-    UNUSED(pin);
-    UNUSED(action);
-
-    if (app.imuTask.Handle)
-    {
-        osSignalSet(app.imuTask.Handle, app.imuTask.Signal);
-    }
-}
 
 /* @brief One-time LIS2DW12 bring-up + wake-up-on-motion configuration, shared
  *        by both phases. Low-power continuous mode @ 12.5 Hz ODR, routed to
@@ -109,12 +103,6 @@ static void imu_configure_wakeup_on_motion(void)
     lis2dw12_pin_int1_route_get(&gImuCtx, &int1_route);
     int1_route.int1_wu = PROPERTY_ENABLE;
     lis2dw12_pin_int1_route_set(&gImuCtx, &int1_route);
-
-    if (!gInt1GpioteReady)
-    {
-        lis2dw12_int1_gpiote_init(sleep_int1_handler); /* registered once; only Phase 2 arms/uses it */
-        gInt1GpioteReady = 1;
-    }
 }
 
 /* @brief Reads (and thereby clears, this chip's interrupt is latched until
@@ -212,86 +200,48 @@ void sleep_watch_stop(void)
     TERMINATE_STD_TASK(app.imuTask);
 }
 
-/* @brief Phase 2: ImuTask - deep sleep, motion is the only wake source. */
-static void ImuTask(void const *argument)
+/* @brief Terminate Phase 1's WatchTask, if any is currently running (e.g. some
+ *        other command interrupted it). Phase 2 below has no task/interrupt
+ *        state to clean up - it either powers the chip off (never returns)
+ *        or fails safe back to Ev_Tag_Task, so this only ever needs to reap
+ *        app.imuTask, not touch the accelerometer.
+ * */
+void sleep_terminate(void)
+{
+    TERMINATE_STD_TASK(app.imuTask);
+}
+
+/* @brief Phase 2: real System OFF sleep, motion is the only wake source.
+ *        Called from main.c on Ev_Sleep_Task, after the normal mode-switch
+ *        teardown has already torn down TAG ranging and reset the DW3000.
+ *        No task is created - nrf_power_system_off() halts the CPU and never
+ *        returns; waking happens via a full chip reset (see main.c, which
+ *        detects the wake reason via RESETREAS and pulses HOST_WAKEUP_Pin
+ *        immediately, then reboots normally back into TAG - which re-arms
+ *        Phase 1 automatically via the hook in tag_helper()).
+ * */
+void sleep_helper(void const *argument)
 {
     UNUSED(argument);
-
-    osMutexDef(imuMutex);
-    app.imuTask.MutexId = osMutexCreate(osMutex(imuMutex));
 
     imu_configure_wakeup_on_motion();
 
     if (!gImuFound)
     {
         /* No accelerometer -> no way to ever wake from real sleep. Fail safe:
-         * don't strand the device asleep, resume ranging immediately instead. */
-        osMutexRelease(app.imuTask.MutexId);
+         * don't power off with no way to wake, resume ranging immediately. */
         xEventGroupSetBits(app.xStartTaskEvent, Ev_Tag_Task);
-
-        for (;;)
-        {
-            osSignalWait(app.imuTask.Signal, osWaitForever);
-        }
+        return;
     }
 
-    imu_poll_motion(); /* flush any stale latch before arming - this is what
-                         * fixed the immediate-false-wake bug seen on hardware */
-    lis2dw12_int1_enable();
+    imu_poll_motion(); /* flush any stale latch before arming - with GPIO
+                         * SENSE an already-asserted pin wakes immediately,
+                         * reproducing the false-wake bug seen earlier if
+                         * skipped. */
 
-    osMutexRelease(app.imuTask.MutexId);
+    nrf_gpio_cfg_sense_input(LIS2DW12_INT1_Pin, NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_SENSE_HIGH);
 
-    /* Blocks here; FreeRTOS tickless idle sleeps the MCU while waiting. */
-    osSignalWait(app.imuTask.Signal, osWaitForever);
+    deca_uart_close(); /* no UART while asleep */
 
-    osMutexWait(app.imuTask.MutexId, 0);
-
-    lis2dw12_int1_disable();
-
-    host_wakeup_pulse();
-    {
-        char *wakeMsg = "wake:motion\r\n";
-        port_tx_msg((uint8_t *)wakeMsg, (int)strlen(wakeMsg));
-    }
-
-    /* Resume TAG ranging. Via the auto-rearm hook in tag_helper(), this
-     * automatically restarts Phase 1 watching too. */
-    xEventGroupSetBits(app.xStartTaskEvent, Ev_Tag_Task);
-
-    osMutexRelease(app.imuTask.MutexId);
-
-    for (;;)
-    {
-        osSignalWait(app.imuTask.Signal, osWaitForever);
-    }
-}
-
-/* @brief Terminate whichever phase's task is currently using app.imuTask, if any.
- *        Safe to call even if neither phase was ever entered.
- * */
-void sleep_terminate(void)
-{
-    if (gImuFound)
-    {
-        lis2dw12_int1_disable();
-    }
-
-    TERMINATE_STD_TASK(app.imuTask);
-}
-
-/* @brief Start Phase 2 (deep sleep). Called from main.c on Ev_Sleep_Task,
- *        after the normal mode-switch teardown has already torn down TAG
- *        ranging and reset the DW3000.
- * */
-void sleep_helper(void const *argument)
-{
-    UNUSED(argument);
-
-    osThreadDef(imuTask, ImuTask, PRIO_ImuTask, 0, 512);
-    app.imuTask.Handle = osThreadCreate(osThread(imuTask), NULL);
-
-    if (app.imuTask.Handle == NULL)
-    {
-        error_handler(1, _ERR_Create_Task_Bad);
-    }
+    nrf_power_system_off(); /* never returns */
 }

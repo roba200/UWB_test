@@ -1,10 +1,10 @@
 /**
  * @file      lis2dw12_platform.c
  *
- * @brief     nRF52840 platform glue (SPI + GPIOTE) for the ST LIS2DW12
- *            accelerometer register driver. Uses a dedicated SPI instance,
- *            separate from the DW3000's (SPIM3), so both chips can be
- *            accessed independently.
+ * @brief     nRF52840 platform glue (SPI) for the ST LIS2DW12 accelerometer
+ *            register driver. Uses a dedicated SPI instance, separate from
+ *            the DW3000's (SPIM3), so both chips can be accessed
+ *            independently.
  *
  * @attention Copyright 2019-2020 (c) Decawave Ltd, Dublin, Ireland.
  *            All rights reserved.
@@ -84,24 +84,10 @@ void lis2dw12_platform_spi_init(stmdev_ctx_t *ctx)
     ctx->handle    = NULL;
 }
 
-void lis2dw12_int1_gpiote_init(nrf_drv_gpiote_evt_handler_t handler)
+void host_wakeup_pin_init(void)
 {
-    nrf_drv_gpiote_in_config_t in_config = GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
-    in_config.pull = NRF_GPIO_PIN_PULLDOWN;
-
-    /* GPIOTE peripheral itself is already initialised by dw_irq_init() at boot. */
-    APP_ERROR_CHECK(nrf_drv_gpiote_in_init(LIS2DW12_INT1_Pin, &in_config, handler));
-    nrf_drv_gpiote_in_event_disable(LIS2DW12_INT1_Pin);
-}
-
-void lis2dw12_int1_enable(void)
-{
-    nrf_drv_gpiote_in_event_enable(LIS2DW12_INT1_Pin, true);
-}
-
-void lis2dw12_int1_disable(void)
-{
-    nrf_drv_gpiote_in_event_disable(LIS2DW12_INT1_Pin);
+    nrf_gpio_cfg_output(HOST_WAKEUP_Pin);
+    nrf_gpio_pin_clear(HOST_WAKEUP_Pin);
 }
 
 void host_wakeup_pulse(void)

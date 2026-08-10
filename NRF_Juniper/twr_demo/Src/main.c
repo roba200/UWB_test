@@ -20,6 +20,7 @@
 #include "app.h"
 
 #include "nrf_drv_wdt.h"
+#include "nrf_power.h"
 
 #include <config.h>
 #include <port.h>
@@ -61,6 +62,8 @@ extern void listener_terminate();
 extern void listener_helper();
 extern void sleep_terminate();
 extern void sleep_helper();
+extern void host_wakeup_pin_init(void);
+extern void host_wakeup_pulse(void);
 
 /**
  * @brief Function for application main entry.
@@ -69,6 +72,28 @@ int main(void)
 {
     int devID = 0, delayCnt = 0, status = 0;
     ret_code_t err_code;
+    int wokeFromSystemOff;
+    
+
+    /* Give HOST_WAKEUP_Pin a defined LOW idle state on every boot, regardless
+     * of wake reason - otherwise it's left floating (nRF52 GPIO reset
+     * default) until the first real wake pulse, reading as a constant HIGH
+     * if the net has an external pull-up. */
+    host_wakeup_pin_init();
+
+    /* Distinguish "just woke from real System OFF sleep via motion" from a
+     * normal power-on/debugger reset, as early as physically possible, so the
+     * host sees the wake pulse with minimal latency regardless of how long
+     * the rest of boot takes. See sleep_helper() in task_sleep.c.
+     *
+     * SystemInit()'s Errata 136 workaround (system_nrf52840.c) has been
+     * patched to preserve the OFF bit, so it's safe to read it live here. */
+    wokeFromSystemOff = (nrf_power_resetreas_get() & NRF_POWER_RESETREAS_OFF_MASK) != 0;
+    if (wokeFromSystemOff)
+    {
+        nrf_power_resetreas_clear(NRF_POWER_RESETREAS_OFF_MASK);
+        host_wakeup_pulse();
+    }
 
     gRangingStart = 0;
 
@@ -91,18 +116,26 @@ int main(void)
 
     app.xStartTaskEvent = xEventGroupCreate(); /**< xStartTaskEvent indicates which tasks to be started */
 
-    for(int i=0; i<6; i++)
+    if (!wokeFromSystemOff)
     {
-        bsp_board_led_invert(BSP_BOARD_LED_0);
-        bsp_board_led_invert(BSP_BOARD_LED_1);
-        nrf_delay_ms(250);
+        /* Purely cosmetic boot animation - skipped on a motion wake so
+         * ranging resumes as quickly as possible. */
+        for(int i=0; i<6; i++)
+        {
+            bsp_board_led_invert(BSP_BOARD_LED_0);
+            bsp_board_led_invert(BSP_BOARD_LED_1);
+            nrf_delay_ms(250);
+        }
     }
 
 #ifdef ENABLE_USB_PRINT
     deca_usb_init();
 #endif
 
-    nrf_delay_ms(1000);        /**< small pause to startup */
+    if (!wokeFromSystemOff)
+    {
+        nrf_delay_ms(1000);        /**< small pause to startup */
+    }
 
   reset_DW3000(); //this will reset DW device
 
