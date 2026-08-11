@@ -18,9 +18,10 @@
 #include "deca_dbg.h"
 #include "port.h"
 #include "usb_uart_tx.h"
-#include "task_sleep.h"
 #include "cmd.h"
 #include "deca_device_api.h"
+#include "lis2dw12.h"
+#include "crc16.h"
 
 #define CMD_COLUMN_WIDTH     10
 #define CMD_COLUMN_MAX       4
@@ -172,38 +173,6 @@ REG_FN(f_stop)
     FlushTask_reset();
     port_tx_msg((uint8_t*)"\r\n",2);
     xEventGroupSetBits(app.xStartTaskEvent, Ev_Stop_All);
-    return (CMD_FN_RET_OK);
-}
-
-/**
- * @brief   Configures the inactivity threshold: TAG ranging continues
- *          normally, and the module only enters low-power sleep after <val>
- *          seconds pass with no motion at all. Once asleep, motion is the
- *          only wake source (no timeout wake). After waking, ranging resumes
- *          and the same threshold automatically re-arms - no need to resend
- *          this command after every wake. This is a persisted runtime
- *          config value (like ADDR/PANID); use SAVE to keep it across reboots.
- *          Usage: "sleep <inactivity_sec>", 0 = disable the feature.
- * */
-REG_FN(f_sleep)
-{
-    pbss->s.inactivityTimeout_sec = (uint16_t)((val < 0) ? 0 : val);
-
-    if (app.mode == mPTAG)
-    {
-        /* TAG is already ranging: (re)arm the watch immediately so the new
-         * value takes effect right away instead of waiting for the next
-         * TAG (re)start. */
-        if (pbss->s.inactivityTimeout_sec > 0)
-        {
-            sleep_watch_start();
-        }
-        else
-        {
-            sleep_watch_stop();
-        }
-    }
-
     return (CMD_FN_RET_OK);
 }
 
@@ -1483,6 +1452,63 @@ REG_FN(f_save)
 }
 
 /**
+ * @brief set the IMU inactivity timeout (seconds) before TAG goes to
+ *        System OFF. Applies live if a tag is currently active, always
+ *        persists to NVM.
+ * */
+REG_FN(f_imu_inactivity)
+{
+    error_e err_code;
+
+    if(val < (int)LIS2DW12_INACTIVITY_SECONDS_MIN || val > (int)LIS2DW12_INACTIVITY_SECONDS_MAX)
+    {
+        return (NULL);
+    }
+
+    pbss->s.imu_cfg_magic = IMU_CFG_MAGIC;
+    pbss->s.imu_inactivity_seconds = (uint32_t)val;
+
+    if(app.mode != mIDLE)
+    {
+        if(lis2dw12_set_inactivity_seconds((uint32_t)val) != 0)
+        {
+            return (NULL);
+        }
+        pbss->s.imu_inactivity_seconds = lis2dw12_get_inactivity_seconds();
+    }
+
+    err_code = save_bssConfig(pbss);
+    if(err_code != _NO_ERR)
+    {
+        error_handler(0, err_code);    //not a fatal error
+        return (NULL);
+    }
+
+    return (CMD_FN_RET_OK);
+}
+
+/**
+ * @brief report the currently-applied IMU inactivity timeout.
+ * */
+REG_FN(f_imu_status)
+{
+    char *str = CMD_MALLOC(MAX_STR_SIZE);
+
+    if(str)
+    {
+        uint32_t inact = (app.mode != mIDLE) ? lis2dw12_get_inactivity_seconds() : pbss->s.imu_inactivity_seconds;
+        int      n     = sprintf(str, "IMUSTAT:INACT:%lu", (unsigned long)inact);
+        uint16_t crc    = calc_crc16((uint8_t *)str, (uint16_t)n);
+
+        sprintf(&str[n], ":%04X\r\n", crc);
+        port_tx_msg((uint8_t *)str, strlen(str));
+        CMD_FREE(str);
+    }
+
+    return (CMD_FN_RET_OK);
+}
+
+/**
   * @}
   */
 
@@ -1503,13 +1529,14 @@ const char COMMENT_SERVICE         []={"Service commands -----"};
 const char STD_CMD_COMMENT         []={"This command described in the documentation"};
 
 const char COMMENT_RCDEL           []={"Time, \'us\', between end of Tag's Blink_TX and Tag start Rx of Ranging Config message. From Node's view this is a delay between end of reception of Blink's data and start of transmission of preamble of the Ranging Config message. This time should be set to the same value on the Tag and on the Node."};
+const char COMMENT_IMUINACT        []={"IMUINACT <seconds>: set the inactivity period (1..3600s) after which TAG sleeps (System OFF) on no motion. Persisted to NVM, applied live if TAG is already running."};
+const char COMMENT_IMUSTAT         []={"Report the currently applied IMU inactivity timeout, seconds."};
 const char COMMENT_REPDEL          []={"Time, \'us\', when Tag shall be ready to receive the Node's Response after end of transmission of the Poll (wait4response). This parameter is defined by the Node and sent to the Tag in the Ranging Config message."};
 const char COMMENT_P2FDEL          []={"Time, \'us\',  when Tag shall transmit Final's RMARKER, calculated from Tag's Poll's RMARKER. This parameter is defined by the Node and sent to the Tag in the Ranging Config message."};
 
 const char COMMENT_STOP            []={"Stops running any top-level applications"};
 const char COMMENT_STAT            []={"Displays the Status information"};
 const char COMMENT_SAVE            []={"Saves the configuration to the NVM"};
-const char COMMENT_SLEEP           []={"Sets the inactivity threshold: TAG ranging continues normally, and the module only enters low-power sleep after <inactivity_sec> seconds pass with no motion. Once asleep, motion is the only wake source (no timeout wake); on wake it pulses HOST_WAKEUP_Pin, resumes ranging, and automatically re-arms the same threshold.\r\nUsage: \"sleep <inactivity_sec>\", 0 = disable."};
 const char COMMENT_DECAJUNIPER     []={"This command reports the running application and the version information"};
 const char COMMENT_HELP            []={"This command displays the help information. Usage: \"help\" or \"help <CMD>\", <CMD> is the command from the list, i.e. \"help tag\"."};
 
@@ -1579,7 +1606,8 @@ const struct command_s known_commands []= {
     {"STOP",    mCmdGrp1 | mANY,   f_stop,                  COMMENT_STOP },
     {"STAT",    mCmdGrp1 | mANY,   f_stat,                  COMMENT_STAT },
     {"SAVE",    mCmdGrp1 | mANY,   f_save,                  COMMENT_SAVE },
-    {"SLEEP",   mCmdGrp1 | mANY,   f_sleep,                 COMMENT_SLEEP },
+    {"IMUINACT",mCmdGrp1 | mANY,   f_imu_inactivity,        COMMENT_IMUINACT },
+    {"IMUSTAT", mCmdGrp1 | mANY,   f_imu_status,            COMMENT_IMUSTAT },
     {"DECA$",   mCmdGrp1 | mANY,   f_decaJuniper,           COMMENT_DECAJUNIPER },
     {"HELP",    mCmdGrp1 | mANY,   f_help_app,              COMMENT_HELP },
     {"?",       mCmdGrp1 | mANY,   f_help_app,              COMMENT_HELP },

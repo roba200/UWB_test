@@ -23,6 +23,7 @@
 #endif
 
 #include <stdint.h>
+#include "lis2dw12.h"
  typedef struct {
     uint16_t    addr;
     uint16_t    node_addr;
@@ -34,6 +35,14 @@
 
 void tag_helper(void const *argument);
 void tag_terminate(void);
+
+/* IMU-driven sleep/wake - see task_tag.c for the state machine. */
+void imu_event_callback(lis2dw12_event_t evt);
+
+/* Host UART notifications for IMU sleep/wake - implemented in json_2pc.c. */
+void send_to_pc_imu_sleep(void);
+void send_to_pc_imu_wake(void);
+void uart_host_wake_gpio_init(void);
 
 #ifdef __cplusplus
 }

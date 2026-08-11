@@ -50,7 +50,10 @@
 #define DEFAULT_PHASECORR_EN        1       /**< enable antenna related phase correction polynomial */
 #define DEFAULT_REPORT_LEVEL        3       /**< what to use as output of TWR: 1:JSON, 2:Reduced, 3:Minimal */
 #define DEFAULT_DEBUG               0       /**< if 1, then the LED_RED used to show an error, if any */
-#define DEFAULT_INACTIVITY_TIMEOUT_SEC  60  /**< SLEEP command: seconds of no motion before auto-sleep. 0 = disabled */
+
+/* IMU (motion/sleep) config */
+#define IMU_CFG_MAGIC                (0xB105F00DU) /**< marker for a valid IMU config block */
+#define DEFAULT_IMU_INACTIVITY_SEC   (30U)          /**< default inactivity period before System OFF, seconds */
 
 /* Slot configuration */
 #define DEFAULT_SLOT_PERIOD_MS      5       /**< Slot period (ms), the best of what the implementation can achieve */
@@ -165,10 +168,12 @@
     .s.phaseCorrEn          = DEFAULT_PHASECORR_EN, \
     .s.reportLevel          = DEFAULT_REPORT_LEVEL, \
     .s.faultyRanges         = 5,\
-    .s.inactivityTimeout_sec = DEFAULT_INACTIVITY_TIMEOUT_SEC, \
     .s.debugEn              = DEFAULT_DEBUG, \
     .s.rcDelay_us           = DEFAULT_TAG_BLINK_TX_RC_RX_US, \
     .s.rcRxTo_us            = DEFAULT_TAG_RC_RX_TIMEOUT_US,\
+    \
+    .s.imu_cfg_magic          = IMU_CFG_MAGIC, \
+    .s.imu_inactivity_seconds = DEFAULT_IMU_INACTIVITY_SEC, \
     \
     .s.antRx_a              = (uint16_t)(0.5* DEFAULT_ANTD), \
     .s.antTx_a              = (uint16_t)(0.5* DEFAULT_ANTD), \
@@ -221,9 +226,13 @@ struct run_s
     uint8_t     reportLevel;    /**< 0 - no output, 1-JSON, 2-limited */
     uint8_t     faultyRanges;   /**< Tag config: number of faulty ranges after that Tag return back to a Discovery phase */
     uint8_t     debugEn;        /**< Enable Red "error" Led and error_handler() */
-    uint16_t    inactivityTimeout_sec; /**< SLEEP command: seconds of no motion before auto-sleep. 0 = disabled */
     uint32_t    rcDelay_us;     /**< Node&Tag delay between end reception of UWB blink and start transmission of UWB Ranging Config message */
     uint16_t    rcRxTo_us;      /**< Tag's Receiver timeout only to save power on non-reception of the Ranging Config */
+
+    /* IMU config: appended, guarded by imu_cfg_magic so devices flashed
+     * before this field existed don't read garbage from unformatted NVM. */
+    uint32_t    imu_cfg_magic;          /**< must equal IMU_CFG_MAGIC; else defaults are applied */
+    uint32_t    imu_inactivity_seconds; /**< inactivity period before System OFF, seconds (1..3600) */
 
     uint16_t    antRx_a;        /**< antenna delay values for the left port */
     uint16_t    antTx_a;        /**< antenna delay values for the left port */

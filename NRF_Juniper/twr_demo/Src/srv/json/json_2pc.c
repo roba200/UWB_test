@@ -14,6 +14,7 @@
 #include "task_tag.h"
 #include "usb_uart_tx.h"
 #include "binary_uart_protocol.h"
+#include "crc16.h"
 
 /*
  * @brief function to report to PC a new tag was discovered
@@ -560,4 +561,49 @@ void send_to_pc_diag_acc(rx_mail_t *pRxMailPckt) {
   }
 
   logNum++;
+}
+
+/* ---- IMU sleep/wake host notifications --------------------------------- */
+
+#define UART_HOST_WAKE_PULSE_MS    (50U)
+#define UART_HOST_WAKE_SETTLE_MS   (150U)
+
+/* @brief Configure the host-wake GPIO once at boot: output, idle-low. */
+void uart_host_wake_gpio_init(void) {
+  nrf_gpio_pin_clear(HOST_WAKEUP_Pin);
+  nrf_gpio_cfg_output(HOST_WAKEUP_Pin);
+  nrf_gpio_pin_clear(HOST_WAKEUP_Pin);
+}
+
+/* @brief One-shot pulse to wake a sleeping host MCU before UART bytes arrive. */
+static void uart_host_wake_pulse(void) {
+  nrf_gpio_pin_set(HOST_WAKEUP_Pin);
+  nrf_delay_ms(UART_HOST_WAKE_PULSE_MS);
+  nrf_gpio_pin_clear(HOST_WAKEUP_Pin);
+  nrf_delay_ms(UART_HOST_WAKE_SETTLE_MS);
+}
+
+/* @brief Builds and sends "TYPE:CRC16HEX\r\n" over UART. */
+static void send_uart_text_packet(const char *type) {
+  char *str = CMD_MALLOC(MAX_STR_SIZE);
+
+  if (str) {
+    int n = sprintf(str, "%s", type);
+    uint16_t crc = calc_crc16((uint8_t *)str, (uint16_t)n);
+
+    sprintf(&str[n], ":%04X\r\n", crc);
+    port_tx_msg((uint8_t *)str, strlen(str));
+    CMD_FREE(str);
+  }
+}
+
+/* @brief Notify the host the tag has gone to sleep (System OFF pending). */
+void send_to_pc_imu_sleep(void) {
+  send_uart_text_packet("IMU_SLEEP");
+}
+
+/* @brief Notify the host the tag is awake (pulses the host-wake GPIO first). */
+void send_to_pc_imu_wake(void) {
+  uart_host_wake_pulse();
+  send_uart_text_packet("IMU_WAKE");
 }

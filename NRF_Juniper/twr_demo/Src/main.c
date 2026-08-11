@@ -18,6 +18,7 @@
 #include "crc16.h"
 
 #include "app.h"
+#include "lis2dw12.h"
 
 #include "nrf_drv_wdt.h"
 #include "nrf_power.h"
@@ -42,6 +43,10 @@ osThreadId        defaultTaskHandle;
 gDiagPrintFStr_t  gDiagPrintFStr;
 app_t             app;    /**< All global variables are in the "app" structure */
 
+/* Set below, before anything else touches RESETREAS; consumed once by
+ * tag_helper() on a motion-wake boot. See app.h. */
+volatile uint8_t  g_systemoff_wakeup_pending;
+
 //-----------------------------------------------------------------------------
 //NRF port
 uint32_t gRTC_SF_PERIOD = 3276;
@@ -60,10 +65,6 @@ void deca_usb_init(void);
 extern void trilat_terminate();
 extern void listener_terminate();
 extern void listener_helper();
-extern void sleep_terminate();
-extern void sleep_helper();
-extern void host_wakeup_pin_init(void);
-extern void host_wakeup_pulse(void);
 
 /**
  * @brief Function for application main entry.
@@ -72,27 +73,15 @@ int main(void)
 {
     int devID = 0, delayCnt = 0, status = 0;
     ret_code_t err_code;
-    int wokeFromSystemOff;
-    
 
-    /* Give HOST_WAKEUP_Pin a defined LOW idle state on every boot, regardless
-     * of wake reason - otherwise it's left floating (nRF52 GPIO reset
-     * default) until the first real wake pulse, reading as a constant HIGH
-     * if the net has an external pull-up. */
-    host_wakeup_pin_init();
-
-    /* Distinguish "just woke from real System OFF sleep via motion" from a
-     * normal power-on/debugger reset, as early as physically possible, so the
-     * host sees the wake pulse with minimal latency regardless of how long
-     * the rest of boot takes. See sleep_helper() in task_sleep.c.
-     *
-     * SystemInit()'s Errata 136 workaround (system_nrf52840.c) has been
-     * patched to preserve the OFF bit, so it's safe to read it live here. */
-    wokeFromSystemOff = (nrf_power_resetreas_get() & NRF_POWER_RESETREAS_OFF_MASK) != 0;
-    if (wokeFromSystemOff)
+    /* Read + clear RESETREAS before anything else can disturb it - this is
+     * how we know whether this boot was a motion-triggered System OFF wake
+     * (OFF bit set by the GPIO-SENSE DETECT signal) versus a normal
+     * power-on/reset. Consumed once, later, by tag_helper(). */
     {
-        nrf_power_resetreas_clear(NRF_POWER_RESETREAS_OFF_MASK);
-        host_wakeup_pulse();
+        uint32_t resetreas = NRF_POWER->RESETREAS;
+        g_systemoff_wakeup_pending = ((resetreas & POWER_RESETREAS_OFF_Msk) != 0U) ? 1U : 0U;
+        NRF_POWER->RESETREAS = resetreas;
     }
 
     gRangingStart = 0;
@@ -100,6 +89,7 @@ int main(void)
     init_crc16();
 
     bsp_board_init(BSP_INIT_LEDS|BSP_INIT_BUTTONS);
+    uart_host_wake_gpio_init();
     peripherals_init();
     port_init_dw_chip();
     dw_irq_init();
@@ -116,28 +106,41 @@ int main(void)
 
     app.xStartTaskEvent = xEventGroupCreate(); /**< xStartTaskEvent indicates which tasks to be started */
 
-    if (!wokeFromSystemOff)
+    for(int i=0; i<6; i++)
     {
-        /* Purely cosmetic boot animation - skipped on a motion wake so
-         * ranging resumes as quickly as possible. */
-        for(int i=0; i<6; i++)
-        {
-            bsp_board_led_invert(BSP_BOARD_LED_0);
-            bsp_board_led_invert(BSP_BOARD_LED_1);
-            nrf_delay_ms(250);
-        }
+        bsp_board_led_invert(BSP_BOARD_LED_0);
+        bsp_board_led_invert(BSP_BOARD_LED_1);
+        nrf_delay_ms(250);
     }
 
 #ifdef ENABLE_USB_PRINT
     deca_usb_init();
 #endif
 
-    if (!wokeFromSystemOff)
-    {
-        nrf_delay_ms(1000);        /**< small pause to startup */
-    }
+    nrf_delay_ms(1000);        /**< small pause to startup */
 
   reset_DW3000(); //this will reset DW device
+
+  {
+      /* Apply the magic-guarded default the first time this firmware runs
+       * on a given device (or after a flash erase) - the field didn't exist
+       * in older NVM images, so a blank/garbage value must not be trusted. */
+      if (app.pConfig->s.imu_cfg_magic != IMU_CFG_MAGIC)
+      {
+          app.pConfig->s.imu_cfg_magic          = IMU_CFG_MAGIC;
+          app.pConfig->s.imu_inactivity_seconds = DEFAULT_IMU_INACTIVITY_SEC;
+      }
+
+      if (lis2dw12_init(E_SPI_INTERFACE, LIS2DW12_MODE_MOTION_ONLY,
+                        app.pConfig->s.imu_inactivity_seconds) == 0)
+      {
+          lis2dw12_event_irq_enable(imu_event_callback);
+      }
+      else
+      {
+          diag_printf("IMU init failed; ranging will proceed without motion/sleep.\r\n");
+      }
+  }
 
   if (dwt_probe((struct dwt_probe_s *)&dw3000_probe_interf))
   {
@@ -209,7 +212,7 @@ void StartDefaultTask(void const * argument)
 {
     const EventBits_t bitsWaitForAny = (Ev_Node_Task | Ev_Tag_Task | Ev_Trilat_N_Task |
                                         Ev_Usb2spi_Task | Ev_Tcwm_Task | Ev_Tcfm_Task | Ev_Listener_Task |
-                                        Ev_Sleep_Task | Ev_Stop_All);
+                                        Ev_Stop_All);
 
     EventBits_t    uxBits;
 
@@ -250,7 +253,6 @@ void StartDefaultTask(void const * argument)
           tcwm_terminate();
           trilat_terminate();
           listener_terminate();
-          sleep_terminate();
 
           FlushTask_reset();
 
@@ -276,11 +278,6 @@ void StartDefaultTask(void const * argument)
       case Ev_Listener_Task:
           app.mode = mLISTENER;
           listener_helper(NULL); /* call Listener helper function which will setup sub-tasks for Listener process */
-          break;
-
-      case Ev_Sleep_Task:
-          app.mode = mSLEEP;
-          sleep_helper(NULL); /* call Sleep helper function which will start the motion/timeout wait task */
           break;
 
 #if (PDOA_TAG == 1)

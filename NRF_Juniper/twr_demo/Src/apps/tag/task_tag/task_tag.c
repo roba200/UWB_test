@@ -15,11 +15,191 @@
 #include "app.h"
 #include "port.h"
 #include "tag.h"
-#include "task_sleep.h"
+#include "lis2dw12.h"
+#include "nrf_gpio.h"
+#include "nrf_power.h"
+#include "nrf_delay.h"
 //-----------------------------------------------------------------------------
 
 #define BLINK_PERIOD_MS            (500)    /* range init phase - Blink send period, ms */
 
+/* ---- IMU-driven sleep/wake ------------------------------------------------
+ *
+ * Motion/inactivity are detected entirely in the LIS2DW12's hardware (see
+ * lis2dw12.c) - this file just reacts to the two events it can raise:
+ *   - LIS2DW12_EVT_MOTION:     resume ranging, tell the host we're awake.
+ *   - LIS2DW12_EVT_STATIONARY: the IMU's own inactivity timer elapsed -
+ *                               pause ranging, sleep the DW3000, and put the
+ *                               whole board into System OFF, arming the
+ *                               LIS2DW12's INT1 (motion) as the wake source.
+ *
+ * imu_event_callback() runs in ISR context and only ever sets a pending-event
+ * bitmask + wakes TagPollTask; all the actual work happens in
+ * tag_handle_imu_events(), called from TagPollTask's own loop.
+ */
+#define IMU_EVT_SLEEP               (0x02U)
+#define IMU_EVT_WAKE                (0x04U)
+
+static volatile uint8_t g_imu_event_pending      = 0;
+static volatile uint8_t g_uwb_ranging_paused     = 0;
+static bool             g_imu_host_awake_reported = true;
+static bool             g_ignore_next_motion_event = false;
+
+static void signal_poll_task_from_imu(void)
+{
+    if(app.pollTask.Handle)
+    {
+        (void)osSignalSet(app.pollTask.Handle, app.pollTask.Signal);
+    }
+}
+
+static uint8_t take_imu_events(void)
+{
+    uint8_t events;
+
+    taskENTER_CRITICAL();
+    events = g_imu_event_pending;
+    g_imu_event_pending = 0;
+    taskEXIT_CRITICAL();
+
+    return events;
+}
+
+static void report_imu_wake_if_needed(void)
+{
+    if(!g_imu_host_awake_reported)
+    {
+        send_to_pc_imu_wake();
+        g_imu_host_awake_reported = true;
+    }
+}
+
+static bool tag_imu_wake_asserted(void)
+{
+    if(lis2dw12_motion_pending())
+    {
+        return true;
+    }
+
+    return nrf_gpio_pin_read(LIS2DW12_INT1_Pin) ? true : false;
+}
+
+static void tag_abort_sleep_for_motion(tag_info_t *p)
+{
+    if(p)
+    {
+        p->stationary_imu = 0;
+        p->stationary = 0;
+    }
+
+    g_uwb_ranging_paused = 0;
+    NVIC_ClearPendingIRQ(RTC0_IRQn);
+    NVIC_EnableIRQ(RTC0_IRQn);
+    lis2dw12_event_irq_enable(imu_event_callback);
+}
+
+/* @brief Consume any pending IMU event(s) and act on them. Called from
+ *        TagPollTask. Returns true if this call just put the board into
+ *        System OFF (caller should not touch anything else afterwards).
+ * */
+static bool tag_handle_imu_events(tag_info_t *p)
+{
+    uint8_t  events = take_imu_events();
+
+    if(!p || events == 0)
+    {
+        return false;
+    }
+
+    if(events & IMU_EVT_WAKE)
+    {
+        report_imu_wake_if_needed();
+        g_uwb_ranging_paused = 0;
+        NVIC_ClearPendingIRQ(RTC0_IRQn);
+        NVIC_EnableIRQ(RTC0_IRQn);
+    }
+
+    if(events & IMU_EVT_SLEEP)
+    {
+        /* Do not enter System OFF if an INT1 wake source is already pending.
+         * Otherwise the GPIO sense input wakes the nRF52 immediately after the
+         * host receives IMU_SLEEP. */
+        lis2dw12_event_irq_disable();
+        lis2dw12_clear_events();
+        if(tag_imu_wake_asserted())
+        {
+            tag_abort_sleep_for_motion(p);
+            return false;
+        }
+
+        send_to_pc_imu_sleep();
+        g_imu_host_awake_reported = false;
+        g_ignore_next_motion_event = false;
+        (void)flush_report_buf();
+        nrf_delay_ms(100);
+
+        NVIC_DisableIRQ(RTC0_IRQn);
+        dwt_forcetrxoff();
+#if (DW_TAG_NOT_SLEEPING == 0)
+        taskENTER_CRITICAL();
+        app.DwEnterSleep = DW_IS_SLEEPING_RX;
+        dwt_entersleep(DWT_DW_IDLE_RC);
+        app.DwSpiReady = DW_SPI_SLEEPING;
+        taskEXIT_CRITICAL();
+#endif
+        g_uwb_ranging_paused = 1;
+        lis2dw12_clear_events();
+        if(tag_imu_wake_asserted())
+        {
+            tag_abort_sleep_for_motion(p);
+            report_imu_wake_if_needed();
+            return false;
+        }
+
+        nrf_gpio_cfg_sense_input(LIS2DW12_INT1_Pin,
+                                 NRF_GPIO_PIN_NOPULL,
+                                 NRF_GPIO_PIN_SENSE_HIGH);
+        nrf_power_system_off();
+        return true;
+    }
+
+    return false;
+}
+
+void imu_event_callback(lis2dw12_event_t evt)
+{
+    tag_info_t *pTwrInfo = getTagInfoPtr();
+    if (!pTwrInfo) return;
+
+    switch (evt)
+    {
+    case LIS2DW12_EVT_STATIONARY:
+        /* IMU built-in timer has elapsed - this interrupt IS the inactivity timeout. */
+        if(g_uwb_ranging_paused) break;
+        pTwrInfo->stationary_imu = 1;
+        pTwrInfo->stationary = 1;
+        g_imu_event_pending &= (uint8_t)~IMU_EVT_WAKE;
+        g_imu_event_pending |= IMU_EVT_SLEEP;
+        signal_poll_task_from_imu();
+        break;
+
+    case LIS2DW12_EVT_MOTION:
+        if (g_ignore_next_motion_event)
+        {
+            g_ignore_next_motion_event = false;
+            break;
+        }
+        pTwrInfo->stationary_imu = 0;
+        pTwrInfo->stationary = 0;
+        g_imu_event_pending &= (uint8_t)~IMU_EVT_SLEEP;
+        g_imu_event_pending |= IMU_EVT_WAKE;
+        signal_poll_task_from_imu();
+        break;
+
+    default:
+        break;
+    }
+}
 
 //-----------------------------------------------------------------------------
 
@@ -92,6 +272,11 @@ TagPollTask(void const * arg)
 
         osMutexWait(app.pollTask.MutexId, 0);
 
+        if(tag_handle_imu_events(p))
+        {
+            osThreadYield();
+            continue;
+        }
 
         if(app.DwSpiReady == DW_SPI_SLEEPING)
         {
@@ -329,16 +514,25 @@ void tag_helper(void const *argument)
         error_handler(1, tmp);
     }
 
+    if(g_systemoff_wakeup_pending)
+    {
+        tag_info_t *p = getTagInfoPtr();
+        if(p)
+        {
+            /* The IMU's own INT1 was the wake source - suppress the
+             * duplicate LIS2DW12_EVT_MOTION callback it will also raise,
+             * and let the host know we're back up. */
+            g_ignore_next_motion_event = true;
+            lis2dw12_clear_events();
+            g_imu_host_awake_reported = false;
+            report_imu_wake_if_needed();
+        }
+        g_systemoff_wakeup_pending = 0;
+    }
+
     tag_process_start();
 
     taskEXIT_CRITICAL();    /**< all RTOS tasks can be scheduled */
-
-    /* Auto re-arm the inactivity watch (if configured) every time TAG starts -
-     * covers boot, an explicit TAG command, and resuming after a motion wake. */
-    if (app.pConfig->s.inactivityTimeout_sec > 0)
-    {
-        sleep_watch_start();
-    }
 }
 
 

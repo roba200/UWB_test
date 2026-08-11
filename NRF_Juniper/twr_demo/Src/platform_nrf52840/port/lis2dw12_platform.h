@@ -3,9 +3,9 @@
  *
  * @brief     nRF52840 platform glue (SPI) for the ST LIS2DW12 accelerometer
  *            register driver (drivers/lis2dw12_driver/driver/lis2dw12_reg.c).
- *            INT1 wake-source arming uses raw GPIO SENSE (System-OFF capable)
- *            configured directly in task_sleep.c via nrf_gpio_cfg_sense_input()
- *            - no GPIOTE/interrupt handling is needed here.
+ *            Used by Src/apps/tag/task_tag/lis2dw12.c, the interrupt-driven
+ *            motion/inactivity driver - this file is purely the SPI
+ *            transport, no interrupt/GPIO handling here.
  *
  * @attention Copyright 2019-2020 (c) Decawave Ltd, Dublin, Ireland.
  *            All rights reserved.
@@ -23,17 +23,6 @@ extern "C" {
 /* Initialises the SPI instance used to talk to the LIS2DW12 and fills in
  * ctx->write_reg / ctx->read_reg / ctx->handle. Safe to call more than once. */
 void lis2dw12_platform_spi_init(stmdev_ctx_t *ctx);
-
-/* Configures HOST_WAKEUP_Pin as an output and drives it low. Call this
- * unconditionally, once, early at boot (regardless of wake reason) so the
- * pin has a well-defined LOW idle level - without this it's left floating
- * (nRF52 GPIO reset default) until the first real wake pulse, which reads as
- * a constant HIGH if the net has an external pull-up. */
-void host_wakeup_pin_init(void);
-
-/* Drives HOST_WAKEUP_Pin high for a few ms then low, to signal the host
- * processor that the module has woken up. */
-void host_wakeup_pulse(void);
 
 #ifdef __cplusplus
 }

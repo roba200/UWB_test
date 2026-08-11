@@ -14,7 +14,6 @@
 #include "port.h"
 #include "lis2dw12_platform.h"
 #include "nrf_drv_spi.h"
-#include "nrf_delay.h"
 
 /* Dedicated SPI instance for the LIS2DW12 - distinct from the DW3000's SPIM3. */
 #define LIS2DW12_SPI_INSTANCE   2
@@ -82,18 +81,4 @@ void lis2dw12_platform_spi_init(stmdev_ctx_t *ctx)
     ctx->write_reg = lis2dw12_platform_write;
     ctx->read_reg  = lis2dw12_platform_read;
     ctx->handle    = NULL;
-}
-
-void host_wakeup_pin_init(void)
-{
-    nrf_gpio_cfg_output(HOST_WAKEUP_Pin);
-    nrf_gpio_pin_clear(HOST_WAKEUP_Pin);
-}
-
-void host_wakeup_pulse(void)
-{
-    nrf_gpio_cfg_output(HOST_WAKEUP_Pin);
-    nrf_gpio_pin_set(HOST_WAKEUP_Pin);
-    nrf_delay_ms(5);
-    nrf_gpio_pin_clear(HOST_WAKEUP_Pin);
 }
