@@ -1413,6 +1413,36 @@ REG_FN(f_help_app)
 // Communication change section
 
 /**
+ * @brief report the chip's EUI-64. Reads app.eui64, cached once in main.c
+ *        right after dwt_initialise() - NOT read live from the DW3000 here,
+ *        because the chip can be in dwt_entersleep() RC sleep at any given
+ *        moment (TagRxTask's fault handling and the IMU sleep path both use
+ *        it), and a live SPI read against a sleeping DW3000 silently comes
+ *        back all zero.
+ * */
+REG_FN(f_eui)
+{
+    char *str = CMD_MALLOC(MAX_STR_SIZE);
+
+    if(str)
+    {
+        int      n;
+        uint16_t crc;
+        uint8_t *eui = app.eui64;
+
+        n = sprintf(str, "EUI:%02X%02X%02X%02X%02X%02X%02X%02X",
+                    eui[0], eui[1], eui[2], eui[3], eui[4], eui[5], eui[6], eui[7]);
+        crc = calc_crc16((uint8_t *)str, (uint16_t)n);
+
+        sprintf(&str[n], ":%04X\r\n", crc);
+        port_tx_msg((uint8_t *)str, strlen(str));
+        CMD_FREE(str);
+    }
+
+    return (CMD_FN_RET_OK);
+}
+
+/**
  * @brief save configuration
  *
  * */
@@ -1529,6 +1559,7 @@ const char COMMENT_SERVICE         []={"Service commands -----"};
 const char STD_CMD_COMMENT         []={"This command described in the documentation"};
 
 const char COMMENT_RCDEL           []={"Time, \'us\', between end of Tag's Blink_TX and Tag start Rx of Ranging Config message. From Node's view this is a delay between end of reception of Blink's data and start of transmission of preamble of the Ranging Config message. This time should be set to the same value on the Tag and on the Node."};
+const char COMMENT_EUI              []={"Report the chip's EUI-64 (cached at boot). Works in any mode."};
 const char COMMENT_IMUINACT        []={"IMUINACT <seconds>: set the inactivity period (1..3600s) after which TAG sleeps (System OFF) on no motion. Persisted to NVM, applied live if TAG is already running."};
 const char COMMENT_IMUSTAT         []={"Report the currently applied IMU inactivity timeout, seconds."};
 const char COMMENT_REPDEL          []={"Time, \'us\', when Tag shall be ready to receive the Node's Response after end of transmission of the Poll (wait4response). This parameter is defined by the Node and sent to the Tag in the Ranging Config message."};
@@ -1605,6 +1636,7 @@ const struct command_s known_commands []= {
     {NULL,      mCmdGrp0 | mANY,   NULL ,                   COMMENT_ANYTIME_OPTIONS},
     {"STOP",    mCmdGrp1 | mANY,   f_stop,                  COMMENT_STOP },
     {"STAT",    mCmdGrp1 | mANY,   f_stat,                  COMMENT_STAT },
+    {"EUI",     mCmdGrp1 | mANY,   f_eui,                   COMMENT_EUI },
     {"SAVE",    mCmdGrp1 | mANY,   f_save,                  COMMENT_SAVE },
     {"IMUINACT",mCmdGrp1 | mANY,   f_imu_inactivity,        COMMENT_IMUINACT },
     {"IMUSTAT", mCmdGrp1 | mANY,   f_imu_status,            COMMENT_IMUSTAT },

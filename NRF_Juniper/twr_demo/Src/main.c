@@ -153,6 +153,13 @@ int main(void)
     error_handler(1, _ERR_INIT);
   }
 
+  /* Cache the EUI here, the one point guaranteed to have the DW3000 awake
+   * and responsive - reading it later (e.g. from the EUI command) can hit
+   * the chip mid-sleep (dwt_entersleep(), used by the existing TagRxTask
+   * fault-handling and by the IMU sleep path) and silently read back all
+   * zero bytes over SPI. */
+  dwt_geteui(app.eui64);
+
     
   /* initialize inter-task communication mail queue for Node :
    *

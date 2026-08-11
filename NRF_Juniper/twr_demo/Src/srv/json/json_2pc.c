@@ -456,12 +456,12 @@ void send_to_pc_twr(result_t *pRes) {
  */
 void send_to_host_eui_binary(void) {
   uint8_t payload[BIN_EUI_FRAME_SIZE];
-  uint8_t eui[8];
 
-  node_get_eui(eui);
-
+  /* app.eui64 is cached once in main.c right after dwt_initialise() -
+   * mode-agnostic, unlike node_get_eui() which only node.c ever populates
+   * (always zero on TAG). */
   payload[0] = BIN_EUI_RESP_FRAME_START;
-  memcpy(&payload[1], eui, sizeof(eui));
+  memcpy(&payload[1], app.eui64, 8);
   payload[9] = binary_twr_calc_checksum(&payload[1], 8);
   payload[10] = BIN_FRAME_END;
 
