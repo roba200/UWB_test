@@ -90,6 +90,21 @@ int main(void)
 
     bsp_board_init(BSP_INIT_LEDS|BSP_INIT_BUTTONS);
     uart_host_wake_gpio_init();
+
+    /* DW3000_WUP_Pin is only ever referenced as metadata in the driver's
+     * probe struct (.wakeUpPin) - nothing actually drives it. Per the
+     * DW3000/DWM3000 datasheet, this is a dedicated active-high WAKEUP
+     * input and "if unused, this pin can be tied to ground" - left
+     * floating, it can either draw current directly (CMOS input
+     * cross-conduction near the switching threshold) or spuriously trigger
+     * a wake, keeping the DW3000 from ever settling into its documented
+     * sub-uA SLEEP/DEEPSLEEP current. Output state is retained through
+     * System OFF, same as the LED/host-wake pins, so driving it low once
+     * here holds it low for the device's whole lifetime including sleep. */
+    nrf_gpio_pin_clear(DW3000_WUP_Pin);
+    nrf_gpio_cfg_output(DW3000_WUP_Pin);
+    nrf_gpio_pin_clear(DW3000_WUP_Pin);
+
     peripherals_init();
     port_init_dw_chip();
     dw_irq_init();
@@ -112,6 +127,17 @@ int main(void)
         bsp_board_led_invert(BSP_BOARD_LED_1);
         nrf_delay_ms(250);
     }
+
+    /* 6 inverts above is an even count, so the blink loop always ends back
+     * at the same state it started from - force a definite, known state
+     * here so tag_handle_imu_events()'s sleep-entry call has something
+     * unambiguous to change.
+     *
+     * Confirmed on hardware: despite LEDS_ACTIVE_STATE=0 (active-low) in
+     * custom_board.h, this board's bsp_board_leds_on()/_off() light the
+     * LEDs backwards from their names - calling "_off()" here is what
+     * actually lights them. */
+    bsp_board_leds_off();
 
 #ifdef ENABLE_USB_PRINT
     deca_usb_init();

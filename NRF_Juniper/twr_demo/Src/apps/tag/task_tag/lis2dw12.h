@@ -28,6 +28,13 @@ extern "C" {
 
 /* ---- Tunables ----------------------------------------------------------- */
 
+/* Master switch for the whole inactivity -> System OFF sleep behaviour
+ * (see tag_handle_imu_events()'s IMU_EVT_SLEEP branch in task_tag.c). Set
+ * to 0 to keep motion detection/reporting (IMU_WAKE, LED, etc.) running as
+ * normal but never actually enter System OFF - handy for development,
+ * where powering all the way down on every idle period gets in the way. */
+#define TAG_SLEEP_MODE_ENABLE               1
+
 #define LIS2DW12_ODR_MOTION_ONLY_HZ        (100)
 
 /* Wake-up (activity) threshold, 1 LSB = FS_XL/64 = 2g/64 = 31.25 mg at FS=2g. */

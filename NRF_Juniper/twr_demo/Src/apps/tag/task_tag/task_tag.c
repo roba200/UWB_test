@@ -119,6 +119,7 @@ static bool tag_handle_imu_events(tag_info_t *p)
         NVIC_EnableIRQ(RTC0_IRQn);
     }
 
+#if (TAG_SLEEP_MODE_ENABLE == 1)
     if(events & IMU_EVT_SLEEP)
     {
         /* Do not enter System OFF if an INT1 wake source is already pending.
@@ -159,9 +160,21 @@ static bool tag_handle_imu_events(tag_info_t *p)
         nrf_gpio_cfg_sense_input(LIS2DW12_INT1_Pin,
                                  NRF_GPIO_PIN_NOPULL,
                                  NRF_GPIO_PIN_SENSE_HIGH);
+
+        /* Only now, right as we're actually committing to it - not on either
+         * of the aborted-sleep paths above, where the board stays awake.
+         * Inside the TAG_SLEEP_MODE_ENABLE guard already, so the LEDs are
+         * only ever touched here when sleep mode is actually active.
+         *
+         * Confirmed on hardware: this board's bsp_board_leds_on()/_off()
+         * light the LEDs backwards from their names (see main.c) - calling
+         * "_on()" here is what actually turns them off. */
+        bsp_board_leds_on();
+
         nrf_power_system_off();
         return true;
     }
+#endif /* TAG_SLEEP_MODE_ENABLE */
 
     return false;
 }
