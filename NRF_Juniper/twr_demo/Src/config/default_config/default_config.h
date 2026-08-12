@@ -53,7 +53,7 @@
 
 /* IMU (motion/sleep) config */
 #define IMU_CFG_MAGIC                (0xB105F00DU) /**< marker for a valid IMU config block */
-#define DEFAULT_IMU_INACTIVITY_SEC   (30U)          /**< default inactivity period before System OFF, seconds */
+#define DEFAULT_IMU_INACTIVITY_SEC   (15U)          /**< default inactivity period before System OFF, seconds */
 
 /* Slot configuration */
 #define DEFAULT_SLOT_PERIOD_MS      5       /**< Slot period (ms), the best of what the implementation can achieve */

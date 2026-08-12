@@ -497,6 +497,7 @@ void tag_terminate(void)
 void tag_helper(void const *argument)
 {
     error_e     tmp;
+    bool        report_wake = false;
 
     port_disable_dw_irq_and_reset(1);
 
@@ -520,12 +521,14 @@ void tag_helper(void const *argument)
         if(p)
         {
             /* The IMU's own INT1 was the wake source - suppress the
-             * duplicate LIS2DW12_EVT_MOTION callback it will also raise,
-             * and let the host know we're back up. */
+             * duplicate LIS2DW12_EVT_MOTION callback it will also raise.
+             * This has to happen now, before ranging (and with it, the IMU
+             * IRQ re-firing) starts - but the actual host notification is
+             * deferred, see below. */
             g_ignore_next_motion_event = true;
             lis2dw12_clear_events();
             g_imu_host_awake_reported = false;
-            report_imu_wake_if_needed();
+            report_wake = true;
         }
         g_systemoff_wakeup_pending = 0;
     }
@@ -533,6 +536,16 @@ void tag_helper(void const *argument)
     tag_process_start();
 
     taskEXIT_CRITICAL();    /**< all RTOS tasks can be scheduled */
+
+    if(report_wake)
+    {
+        /* Deferred until ranging is actually running and the critical
+         * section is released - report_imu_wake_if_needed() blocks for
+         * ~200ms (the host-wake GPIO pulse's settle delay), and there's no
+         * reason to hold up scheduling, or tell the host we're "awake",
+         * before that's actually true. */
+        report_imu_wake_if_needed();
+    }
 }
 
 

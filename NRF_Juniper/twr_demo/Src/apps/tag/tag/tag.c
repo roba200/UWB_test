@@ -581,7 +581,7 @@ void tag_process_start(void)
     //start the RTC timer
     NVIC_EnableIRQ(RTC0_IRQn);
 
-    diag_printf("Tag Top Application: Started\r\n");
+    //diag_printf("Tag Top Application: Started\r\n");
 }
 
 
