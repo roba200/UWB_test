@@ -29,7 +29,9 @@ extern "C" {
 #define LED_START      LED_1
 #define LED_STOP       LED_2
 
-#define LEDS_ACTIVE_STATE 0
+/* LEDs on this board are active-high.  The old value (0) made every BSP
+ * on/off API operate backwards and made low-power call sites error-prone. */
+#define LEDS_ACTIVE_STATE 1
 
 #define LEDS_LIST { LED_1, LED_2 }
 

@@ -161,15 +161,27 @@ static bool tag_handle_imu_events(tag_info_t *p)
                                  NRF_GPIO_PIN_NOPULL,
                                  NRF_GPIO_PIN_SENSE_HIGH);
 
-        /* Only now, right as we're actually committing to it - not on either
-         * of the aborted-sleep paths above, where the board stays awake.
-         * Inside the TAG_SLEEP_MODE_ENABLE guard already, so the LEDs are
-         * only ever touched here when sleep mode is actually active.
-         *
-         * Confirmed on hardware: this board's bsp_board_leds_on()/_off()
-         * light the LEDs backwards from their names (see main.c) - calling
-         * "_on()" here is what actually turns them off. */
-        bsp_board_leds_on();
+        /* Arm GPIO wake only after the IMU latch has been cleared.  Recheck
+         * after programming SENSE to close the race where INT1 rises between
+         * the earlier check and SYSTEMOFF, which otherwise causes an
+         * immediate reset and makes the board look as if it never slept. */
+        __DSB();
+        if(tag_imu_wake_asserted() || nrf_gpio_pin_read(LIS2DW12_INT1_Pin))
+        {
+            nrf_gpio_cfg_input(LIS2DW12_INT1_Pin, NRF_GPIO_PIN_NOPULL);
+            tag_abort_sleep_for_motion(p);
+            report_imu_wake_if_needed();
+            return false;
+        }
+
+        /* Correct board polarity is defined in custom_board.h, so this now
+         * drives both LED pins to their real inactive level before OFF. */
+        bsp_board_leds_off();
+
+        /* Ensure retained GPIO writes and the SENSE configuration have
+         * reached the peripheral before requesting System OFF. */
+        __DSB();
+        __ISB();
 
         nrf_power_system_off();
         return true;

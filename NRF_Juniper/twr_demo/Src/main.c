@@ -128,16 +128,9 @@ int main(void)
         nrf_delay_ms(250);
     }
 
-    /* 6 inverts above is an even count, so the blink loop always ends back
-     * at the same state it started from - force a definite, known state
-     * here so tag_handle_imu_events()'s sleep-entry call has something
-     * unambiguous to change.
-     *
-     * Confirmed on hardware: despite LEDS_ACTIVE_STATE=0 (active-low) in
-     * custom_board.h, this board's bsp_board_leds_on()/_off() light the
-     * LEDs backwards from their names - calling "_off()" here is what
-     * actually lights them. */
-    bsp_board_leds_off();
+    /* The blink loop has an even number of transitions.  Leave the LEDs in
+     * the explicit awake state; sleep entry turns them off. */
+    bsp_board_leds_on();
 
 #ifdef ENABLE_USB_PRINT
     deca_usb_init();
