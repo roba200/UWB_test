@@ -27,7 +27,10 @@ static bool                      s_irq_gpiote_init = false;
 /* ---- Internal helpers ----------------------------------------------------- */
 
 /* Convert inactivity seconds -> act_sleep_dur register value.
- * Register is 8 bits, 1 LSB = 512/ODR seconds. Clamp to 1..255. */
+ * The SLEEP_DUR field of WAKE_UP_DUR is only 4 bits wide (0..15), 1 LSB =
+ * 512/ODR seconds (5.12 s at 100 Hz), so the hardware tops out at 15 LSB =
+ * 76.8 s. Requests are clamped to that range here; writing a larger value
+ * into the 4-bit field would silently wrap modulo 16 (e.g. 90 s -> ~10 s). */
 static uint8_t s_seconds_to_act_sleep_dur(uint32_t seconds, uint16_t odr_hz)
 {
     uint32_t reg;
@@ -36,9 +39,16 @@ static uint8_t s_seconds_to_act_sleep_dur(uint32_t seconds, uint16_t odr_hz)
     if (seconds > LIS2DW12_INACTIVITY_SECONDS_MAX) seconds = LIS2DW12_INACTIVITY_SECONDS_MAX;
 
     reg = ((uint32_t)seconds * (uint32_t)odr_hz + 256U) / 512U;
-    if (reg < 1U)   reg = 1U;
-    if (reg > 255U) reg = 255U;
+    if (reg < 1U)                         reg = 1U;
+    if (reg > LIS2DW12_SLEEP_DUR_REG_MAX) reg = LIS2DW12_SLEEP_DUR_REG_MAX;
     return (uint8_t)reg;
+}
+
+/* Whole seconds the given register value actually gives (rounded down, so
+ * we never report more than the chip will really wait). */
+static uint32_t s_act_sleep_dur_to_seconds(uint8_t reg, uint16_t odr_hz)
+{
+    return ((uint32_t)reg * 512U) / (uint32_t)odr_hz;
 }
 
 /* INT1/INT2 ISR: decode which event fired by reading source registers. */
@@ -109,9 +119,7 @@ static int32_t s_apply_config(uint32_t inactivity_seconds)
     /* Inactivity (sleep) duration, converted from seconds at the current ODR. */
     act_sleep_reg = s_seconds_to_act_sleep_dur(inactivity_seconds, odr_hz);
     if (lis2dw12_act_sleep_dur_set(ctx, act_sleep_reg) != 0) return -1;
-    if (inactivity_seconds < LIS2DW12_INACTIVITY_SECONDS_MIN) inactivity_seconds = LIS2DW12_INACTIVITY_SECONDS_MIN;
-    if (inactivity_seconds > LIS2DW12_INACTIVITY_SECONDS_MAX) inactivity_seconds = LIS2DW12_INACTIVITY_SECONDS_MAX;
-    s_inactivity_s = inactivity_seconds;
+    s_inactivity_s = s_act_sleep_dur_to_seconds(act_sleep_reg, odr_hz);
 
     /* Activity/inactivity detection engine ON. */
     if (lis2dw12_act_mode_set(ctx, LIS2DW12_DETECT_ACT_INACT) != 0) return -1;
@@ -207,9 +215,9 @@ int32_t lis2dw12_set_inactivity_seconds(uint32_t seconds)
     reg = s_seconds_to_act_sleep_dur(seconds, LIS2DW12_ODR_MOTION_ONLY_HZ);
     if (lis2dw12_act_sleep_dur_set(&s_ctx, reg) != 0) return -1;
 
-    if (seconds < LIS2DW12_INACTIVITY_SECONDS_MIN) seconds = LIS2DW12_INACTIVITY_SECONDS_MIN;
-    if (seconds > LIS2DW12_INACTIVITY_SECONDS_MAX) seconds = LIS2DW12_INACTIVITY_SECONDS_MAX;
-    s_inactivity_s = seconds;
+    /* Report what the chip will really use (5.12 s granularity), not what
+     * was asked for. */
+    s_inactivity_s = s_act_sleep_dur_to_seconds(reg, LIS2DW12_ODR_MOTION_ONLY_HZ);
     return 0;
 }
 

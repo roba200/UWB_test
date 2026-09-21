@@ -55,7 +55,7 @@ typedef enum
 usb_data_e waitForCommand(uint8_t *pBuf , uint16_t len, uint16_t *read_offset,uint16_t cyclic_size)
 {
     usb_data_e      		ret=NO_DATA;
-    static uint8_t  		cmdLen = 0;
+    static uint16_t 		cmdLen = 0;   /* 16-bit: with uint8_t the "command too long" check below (>= 256) could never be true, and a long line silently wrapped around */
     static uint8_t  		cmdBuf[MAX_CMD_LENGTH]; /* Commands buffer */
     static uint8_t          binEuiBuf[BIN_EUI_FRAME_SIZE];
     static uint8_t          binEuiLen = 0;

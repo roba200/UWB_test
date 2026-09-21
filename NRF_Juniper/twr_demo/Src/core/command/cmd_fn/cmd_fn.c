@@ -22,6 +22,7 @@
 #include "deca_device_api.h"
 #include "lis2dw12.h"
 #include "crc16.h"
+#include "node.h"
 
 #define CMD_COLUMN_WIDTH     10
 #define CMD_COLUMN_MAX       4
@@ -241,7 +242,13 @@ REG_FN(f_ant_rx_b)
 }
 REG_FN(f_pdoa_offset)
 {
+    CMD_ENTER_CRITICAL();
     pbss->s.pdoaOffset_deg = (int16_t)val;
+    if(app.mode == mPNODE)
+    {
+        node_apply_pdoa_offset_deg(pbss->s.pdoaOffset_deg);
+    }
+    CMD_EXIT_CRITICAL();
     return (CMD_FN_RET_OK);
 }
 REG_FN(f_rng_offset)
@@ -1483,8 +1490,10 @@ REG_FN(f_save)
 
 /**
  * @brief set the IMU inactivity timeout (seconds) before TAG goes to
- *        System OFF. Applies live if a tag is currently active, always
- *        persists to NVM.
+ *        System OFF. Applied immediately in every mode (the IMU is set up
+ *        once at boot regardless of mode, so there is nothing to wait for)
+ *        and persisted to NVM. The stored value is what the chip will really
+ *        use (5.12 s steps, max 76 s), not necessarily what was requested.
  * */
 REG_FN(f_imu_inactivity)
 {
@@ -1495,17 +1504,15 @@ REG_FN(f_imu_inactivity)
         return (NULL);
     }
 
-    pbss->s.imu_cfg_magic = IMU_CFG_MAGIC;
-    pbss->s.imu_inactivity_seconds = (uint32_t)val;
-
-    if(app.mode != mIDLE)
+    /* Fails if the IMU isn't up (not a tag, or it failed init at boot):
+     * better to say so than to save a setting that can never take effect. */
+    if(lis2dw12_set_inactivity_seconds((uint32_t)val) != 0)
     {
-        if(lis2dw12_set_inactivity_seconds((uint32_t)val) != 0)
-        {
-            return (NULL);
-        }
-        pbss->s.imu_inactivity_seconds = lis2dw12_get_inactivity_seconds();
+        return (NULL);
     }
+
+    pbss->s.imu_cfg_magic = IMU_CFG_MAGIC;
+    pbss->s.imu_inactivity_seconds = lis2dw12_get_inactivity_seconds();
 
     err_code = save_bssConfig(pbss);
     if(err_code != _NO_ERR)
@@ -1526,7 +1533,7 @@ REG_FN(f_imu_status)
 
     if(str)
     {
-        uint32_t inact = (app.mode != mIDLE) ? lis2dw12_get_inactivity_seconds() : pbss->s.imu_inactivity_seconds;
+        uint32_t inact = lis2dw12_get_inactivity_seconds();
         int      n     = sprintf(str, "IMUSTAT:INACT:%lu", (unsigned long)inact);
         uint16_t crc    = calc_crc16((uint8_t *)str, (uint16_t)n);
 
@@ -1560,7 +1567,7 @@ const char STD_CMD_COMMENT         []={"This command described in the documentat
 
 const char COMMENT_RCDEL           []={"Time, \'us\', between end of Tag's Blink_TX and Tag start Rx of Ranging Config message. From Node's view this is a delay between end of reception of Blink's data and start of transmission of preamble of the Ranging Config message. This time should be set to the same value on the Tag and on the Node."};
 const char COMMENT_EUI              []={"Report the chip's EUI-64 (cached at boot). Works in any mode."};
-const char COMMENT_IMUINACT        []={"IMUINACT <seconds>: set the inactivity period (1..3600s) after which TAG sleeps (System OFF) on no motion. Persisted to NVM, applied live if TAG is already running."};
+const char COMMENT_IMUINACT        []={"IMUINACT <seconds>: set the inactivity period (1..76s, 5.12s steps) after which TAG sleeps (System OFF) on no motion. Applied immediately and persisted to NVM."};
 const char COMMENT_IMUSTAT         []={"Report the currently applied IMU inactivity timeout, seconds."};
 const char COMMENT_REPDEL          []={"Time, \'us\', when Tag shall be ready to receive the Node's Response after end of transmission of the Poll (wait4response). This parameter is defined by the Node and sent to the Tag in the Ranging Config message."};
 const char COMMENT_P2FDEL          []={"Time, \'us\',  when Tag shall transmit Final's RMARKER, calculated from Tag's Poll's RMARKER. This parameter is defined by the Node and sent to the Tag in the Ranging Config message."};

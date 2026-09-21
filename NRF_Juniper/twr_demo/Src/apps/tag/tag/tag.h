@@ -194,6 +194,10 @@ struct tag_info_s
 
     uint16_t    lateTX;             //used for Debug to count any lateTX
 
+    volatile
+    uint32_t    lastAnchorContactTick;  /* portGetTickCount() at last successful contact */
+    bool        anchorLostReported;     /* true once ANCHOR_LOST sent for current loss episode */
+
     enum
     {
      BLINKING_MODE,

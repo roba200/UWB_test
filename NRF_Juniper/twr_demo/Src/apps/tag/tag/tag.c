@@ -391,6 +391,7 @@ error_e tag_process_init(void)
      * */
     memset(pTagInfo, 0 , sizeof(tag_info_t));
 
+    pTagInfo->lastAnchorContactTick = portGetTickCount();
 
     {// For Trilat demo purposes Fixed tags can supply their locations in the payload
         pTagInfo->pos.pos_x[0] = app.pConfig->s.fixed_pos_x_mm &0xFF;
@@ -1016,6 +1017,8 @@ error_e initiator_received_ranging_config(rx_pckt_t_t *pRxPckt, tag_info_t *pTwr
         rtcNow = nrf_drv_rtc_counter_get(&rtc);;                    // NRF: MCU RTC time : this will be HW timestamped
 
         pTwrInfo->mode = RANGING_MODE;
+        pTwrInfo->lastAnchorContactTick = portGetTickCount();
+        pTwrInfo->anchorLostReported = false;
 
         //STM32: RTC is counting down
         tmpNow = (rtcNow > pTwrInfo->gRtcSFrameZeroCnt)?

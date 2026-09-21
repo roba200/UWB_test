@@ -73,6 +73,24 @@
 #define D_M_9    (0.017883104683497245f)       /* Distance between centers of antennas, ~(L_M/2), m, CH9 */
 
 
+void
+node_apply_pdoa_offset_deg(int16_t pdoa_offset_deg)
+{
+    if(pdoa_offset_deg < 0)
+    {
+        dwt_setpdoaoffset((int)(-1*(pdoa_offset_deg)*M_PI)*(1<<11)/180);
+    }
+    else if(pdoa_offset_deg > 0)
+    {
+        dwt_setpdoaoffset((int)((360 - (pdoa_offset_deg))*M_PI)*(1<<11)/180);
+    }
+    else
+    {
+        dwt_setpdoaoffset((int)((0)*M_PI)*(1<<11)/180);
+    }
+}
+
+
 //-----------------------------------------------------------------------------
 /* Note : for slot period less than 10 ms, more sophisticated TagHW shall be used.
  * STM32L1x & STM32F3x provide RTC with resolution of 61.035us, thus
@@ -1314,18 +1332,7 @@ error_e node_process_init()
     p.shortadd    = pNodeInfo->eui16;
 
     rxtx_configure(&p);
-    if(app.pConfig->s.pdoaOffset_deg < 0)
-    {
-        dwt_setpdoaoffset((int)(-1*(app.pConfig->s.pdoaOffset_deg)*M_PI)*(1<<11)/180);
-    }
-    else if(app.pConfig->s.pdoaOffset_deg > 0)
-    {
-        dwt_setpdoaoffset((int)((360 - (app.pConfig->s.pdoaOffset_deg))*M_PI)*(1<<11)/180);
-    }
-    else
-    {
-        dwt_setpdoaoffset((int)((0)*M_PI)*(1<<11)/180);
-    }
+    node_apply_pdoa_offset_deg(app.pConfig->s.pdoaOffset_deg);
 
     dwt_setleds(DWT_LEDS_ENABLE | DWT_LEDS_INIT_BLINK) ;     /**< DEBUG I/O 2&3 : configure the GPIOs which control the LEDs on HW */
     dwt_setlnapamode(DWT_TXRX_EN);  /**< DEBUG I/O 0&1 : configure TX/RX states to output on GPIOs */

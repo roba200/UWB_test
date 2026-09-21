@@ -46,6 +46,21 @@ static volatile uint8_t g_uwb_ranging_paused = 0;
 static bool g_imu_host_awake_reported = true;
 static bool g_ignore_next_motion_event = false;
 
+/* Hard-coded: no successful anchor contact for this long -> notify the host
+ * once (ANCHOR_LOST), independent of the faultyRangesCnt-based restart
+ * mechanism below. Covers both "stuck in discovery" and "was ranging, now
+ * failing", since it's driven off tag_info_t's lastAnchorContactTick rather
+ * than the ranging-only fault counter. */
+#define ANCHOR_LOST_TIMEOUT_MS (10000U)
+
+static void tag_check_anchor_lost(tag_info_t *p) {
+  if (p && !p->anchorLostReported &&
+      check_timer(p->lastAnchorContactTick, ANCHOR_LOST_TIMEOUT_MS)) {
+    send_to_pc_anchor_lost();
+    p->anchorLostReported = true;
+  }
+}
+
 static void signal_poll_task_from_imu(void) {
   if (app.pollTask.Handle) {
     (void)osSignalSet(app.pollTask.Handle, app.pollTask.Signal);
@@ -267,6 +282,8 @@ static void BlinkTask(void const *arg) {
         app.blinkTask.MutexId,
         0); // we do not want the task can be deleted in the middle of operation
 
+    tag_check_anchor_lost(p);
+
     if (app.DwSpiReady == DW_SPI_SLEEPING) {
       taskENTER_CRITICAL();
       tag_wakeup_dw3000_blink_poll(p);
@@ -310,6 +327,8 @@ static void TagPollTask(void const *arg) {
       osThreadYield();
       continue;
     }
+
+    tag_check_anchor_lost(p);
 
     if (app.DwSpiReady == DW_SPI_SLEEPING) {
       taskENTER_CRITICAL();
@@ -378,6 +397,8 @@ static void TagRxTask(void const *arg) {
       switch (ret) {
       case _NO_Err_Response:
         ptwrInfo->faultyRangesCnt = 0;
+        ptwrInfo->lastAnchorContactTick = portGetTickCount();
+        ptwrInfo->anchorLostReported = false;
         p.addr = AR2U16(ptwrInfo->env.tagAddr);
         p.node_addr = AR2U16(ptwrInfo->env.nodeAddr);
         p.rNum = prxPckt->msg.respExtMsg.resp.rNum;

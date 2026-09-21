@@ -68,7 +68,7 @@ void command_parser(char *text)
     char *		temp_str=text;
     uint8_t		cnt;
     command_e	equal;
-    int			val;
+    int			val = 0;
     cJSON 		*json_root,*json_params;
     char  		cmd[20];
     const char	*ret;
@@ -91,6 +91,8 @@ void command_parser(char *text)
         json_params=NULL;
         json_root=NULL;
         cmd[0]=0;//Initialize no command
+        val=0;   //a command sent without its numeric argument gets 0 - not whatever
+                 //was left on the stack (or in a previous command of this batch)
 
         if ( *text == '{' )
         {//Probably a Json command
@@ -111,6 +113,14 @@ void command_parser(char *text)
         else
         {//It is not a Json command
         	sscanf(text,"%9s %d", cmd,&val);
+        }
+
+        for (char *p = cmd; *p; ++p)
+        {
+            if (*p >= 'a' && *p <= 'z')
+            {
+                *p = (char)(*p - ('a' - 'A'));
+            }
         }
 
         while (known_commands[cnt].cmnt != NULL)

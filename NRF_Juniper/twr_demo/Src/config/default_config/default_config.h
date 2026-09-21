@@ -232,7 +232,7 @@ struct run_s
     /* IMU config: appended, guarded by imu_cfg_magic so devices flashed
      * before this field existed don't read garbage from unformatted NVM. */
     uint32_t    imu_cfg_magic;          /**< must equal IMU_CFG_MAGIC; else defaults are applied */
-    uint32_t    imu_inactivity_seconds; /**< inactivity period before System OFF, seconds (1..3600) */
+    uint32_t    imu_inactivity_seconds; /**< inactivity period before System OFF, seconds (1..76, hardware limit of the IMU timer) */
 
     uint16_t    antRx_a;        /**< antenna delay values for the left port */
     uint16_t    antTx_a;        /**< antenna delay values for the left port */

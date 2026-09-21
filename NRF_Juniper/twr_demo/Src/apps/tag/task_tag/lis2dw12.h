@@ -43,12 +43,21 @@ extern "C" {
 /* Wake-up duration, in ODR samples - debounces short spikes. */
 #define LIS2DW12_WAKE_DURATION_SAMPLES     (1)
 
-/* Default inactivity period, in seconds (used on first boot / invalid NVM). */
-#define LIS2DW12_DEFAULT_INACTIVITY_SECONDS (30U)
+/* Default inactivity period, in seconds (used on first boot / invalid NVM).
+ * Keep equal to DEFAULT_IMU_INACTIVITY_SEC in default_config.h - that one is
+ * what main.c actually applies. */
+#define LIS2DW12_DEFAULT_INACTIVITY_SECONDS (15U)
 
-/* Bounds for host-configurable inactivity period (seconds). */
+/* The chip's SLEEP_DUR field is 4 bits wide: 0..15, 1 LSB = 512/ODR. */
+#define LIS2DW12_SLEEP_DUR_REG_MAX         (15U)
+
+/* Bounds for host-configurable inactivity period (seconds). The maximum is
+ * the hardware limit: 15 LSB x 512 / 100 Hz = 76.8 s. Anything longer would
+ * need a software timer on top of the chip's inactivity interrupt. The
+ * effective resolution is 5.12 s, so the value in use can be up to ~5 s
+ * lower than requested (see lis2dw12_get_inactivity_seconds()). */
 #define LIS2DW12_INACTIVITY_SECONDS_MIN    (1U)
-#define LIS2DW12_INACTIVITY_SECONDS_MAX    (3600U)
+#define LIS2DW12_INACTIVITY_SECONDS_MAX    (76U)
 
 
 /**
@@ -95,7 +104,7 @@ typedef void (*pfn_imu_event_callback_t)(lis2dw12_event_t evt);
  *
  * @param[in] interface         Bus interface - only E_SPI_INTERFACE is implemented.
  * @param[in] mode              Operating mode - only LIS2DW12_MODE_MOTION_ONLY exists.
- * @param[in] inactivity_seconds Host-configured inactivity period (1..3600 s).
+ * @param[in] inactivity_seconds Host-configured inactivity period (1..76 s, see LIS2DW12_INACTIVITY_SECONDS_MAX).
  *                               The IMU's built-in ACT_SLEEP_DUR register is the
  *                               authoritative inactivity timer; no RTOS timer is used.
  * @return 0 on success, -1 on failure. On failure the caller should still operate

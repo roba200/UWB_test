@@ -19,6 +19,7 @@ extern "C" {
 #endif
 
 #include "nrf_gpio.h"
+#include "app_role.h"
 
 // LEDs definitions
 #define LEDS_NUMBER    2
@@ -29,9 +30,21 @@ extern "C" {
 #define LED_START      LED_1
 #define LED_STOP       LED_2
 
-/* LEDs on this board are active-high.  The old value (0) made every BSP
- * on/off API operate backwards and made low-power call sites error-prone. */
+/* LED polarity follows the role, because the two roles run on different
+ * hardware and each keeps the setting it was verified with:
+ *   TAG  - the tag board's LEDs are active-high (the old value, 0, made every
+ *          BSP on/off API operate backwards and made low-power call sites
+ *          error-prone).
+ *   NODE - anchors keep the original active-low setting.
+ * Define LEDS_ACTIVE_STATE yourself (project preprocessor definitions) to
+ * override either. */
+#ifndef LEDS_ACTIVE_STATE
+#if (APPLICATION == TAG)
 #define LEDS_ACTIVE_STATE 1
+#else
+#define LEDS_ACTIVE_STATE 0
+#endif
+#endif
 
 #define LEDS_LIST { LED_1, LED_2 }
 

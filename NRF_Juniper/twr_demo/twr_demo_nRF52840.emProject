@@ -122,11 +122,7 @@
       <file file_name="Src/main.c" />
       <folder Name="apps">
         <folder Name="node">
-          <file file_name="Src/apps/node/node/node.c">
-            <configuration
-              Name="Debug"
-              c_preprocessor_definitions="APPLICATION=TAG" />
-          </file>
+          <file file_name="Src/apps/node/node/node.c" />
           <file file_name="Src/apps/node/task_node/task_node.c" />
         </folder>
         <folder Name="tag">

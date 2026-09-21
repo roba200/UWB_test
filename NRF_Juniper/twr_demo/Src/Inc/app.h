@@ -50,26 +50,15 @@
      Ev_Stop_All         = 0x800000,
  };
 
-/* Build-time application selector.
- * Set APPLICATION=NODE or APPLICATION=TAG in the project preprocessor definitions.
+/* Build-time application selector: set APPLICATION=NODE or APPLICATION=TAG in
+ * the project preprocessor definitions - see app_role.h.
  */
-#ifndef NODE
-#define NODE                1
-#endif
-#ifndef TAG
-#define TAG                 2
-#endif
-
-#ifndef APPLICATION
-#define APPLICATION         NODE
-#endif
+#include "app_role.h"
 
 #if (APPLICATION == NODE)
 #define APPLICATION_DEFAULT_EVENT    Ev_Node_Task
-#elif (APPLICATION == TAG)
+#else /* TAG - anything else is rejected by app_role.h */
 #define APPLICATION_DEFAULT_EVENT    Ev_Tag_Task
-#else
-#error "APPLICATION must be set to NODE or TAG"
 #endif
 
 #ifndef AUTO_D2K_ON_TAG_FOUND

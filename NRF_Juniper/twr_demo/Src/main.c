@@ -89,6 +89,7 @@ int main(void)
     init_crc16();
 
     bsp_board_init(BSP_INIT_LEDS|BSP_INIT_BUTTONS);
+#if (APPLICATION == TAG)
     uart_host_wake_gpio_init();
 
     /* DW3000_WUP_Pin is only ever referenced as metadata in the driver's
@@ -104,6 +105,7 @@ int main(void)
     nrf_gpio_pin_clear(DW3000_WUP_Pin);
     nrf_gpio_cfg_output(DW3000_WUP_Pin);
     nrf_gpio_pin_clear(DW3000_WUP_Pin);
+#endif /* APPLICATION == TAG: host-wake pin / DW3000 WUP pin (sleeping tags only) */
 
     peripherals_init();
     port_init_dw_chip();
@@ -128,9 +130,11 @@ int main(void)
         nrf_delay_ms(250);
     }
 
+#if (APPLICATION == TAG)
     /* The blink loop has an even number of transitions.  Leave the LEDs in
      * the explicit awake state; sleep entry turns them off. */
     bsp_board_leds_on();
+#endif
 
 #ifdef ENABLE_USB_PRINT
     deca_usb_init();
@@ -140,6 +144,7 @@ int main(void)
 
   reset_DW3000(); //this will reset DW device
 
+#if (APPLICATION == TAG)
   {
       /* Apply the magic-guarded default the first time this firmware runs
        * on a given device (or after a flash erase) - the field didn't exist
@@ -160,6 +165,7 @@ int main(void)
           diag_printf("IMU init failed; ranging will proceed without motion/sleep.\r\n");
       }
   }
+#endif /* APPLICATION == TAG: the IMU / motion-sleep is a tag feature */
 
   if (dwt_probe((struct dwt_probe_s *)&dw3000_probe_interf))
   {
