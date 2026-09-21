@@ -530,7 +530,16 @@ error_e tag_process_init(void)
     uint8_t euiLong[8] = {0};
     dwt_geteui(euiLong); //read EUI-64 from the chip (or from stored config if OTP is unprogrammed)
     // memcpy(s_node_eui, euiLong, 8);
-    pTagInfo->eui64 = AR2U16(euiLong);
+
+    /* Tag short ID = the LAST two bytes of the EUI as the "EUI" command prints
+     * it (euiLong[0] is the first hex pair, euiLong[7] the last). For
+     * 1a76d900003a65b0 that is 0x65b0 - the same 16 bits the host puts in the
+     * BLE name/advertisement ("TAG-65b0"), so the ID an anchor reports
+     * (tag_addr in the 0xAF frame) matches what the phone shows. Nodes derive
+     * the tag's short address from the low 16 bits of this blink ID
+     * (task_node.c, AUTO_D2K_ON_TAG_FOUND), so no node change is needed.
+     * Previously this was AR2U16(euiLong) = the FIRST two bytes (0x761a). */
+    pTagInfo->eui64 = (uint16_t)(((uint16_t)euiLong[6] << 8) | euiLong[7]);
 
 
     /*
