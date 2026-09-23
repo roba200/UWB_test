@@ -8,7 +8,7 @@
  * [0xAA][TAG_ID:2LE][ANCHOR_ID:2LE][DISTANCE:2LE][RANGE:1][FLAGS:1][X_CM:2LE][Y_CM:2LE][CHK:1][0x55]
  *
  * Extended TWR frame format:
- * [0xAE][TAG_ID:2LE][ANCHOR_ID:2LE][DIST_MM:4LE][RANGE:1][FLAGS16:2LE][X_CM:2LE][Y_CM:2LE][PDOA_CDEG:2LE][CHK:1][0x55]
+ * [0xAE][TAG_ID:2LE][ANCHOR_ID:2LE][DIST_MM:4LE][RANGE:1][FLAGS16:2LE][X_CM:2LE][Y_CM:2LE][PDOA_CDEG:2LE][BATTERY_PCT:1][HEART_RATE_X10:2LE][SPO2_X10:2LE][TEMP_CENTI_C:2LE][CHK:1][0x55]
  *
  * New-tag frame format:
  * [0xAB][TAG_ADDR64:8LE][CHK:1][0x55]
@@ -42,8 +42,8 @@ extern "C" {
 #define BIN_FRAME_END           0x55
 #define BIN_FRAME_SIZE          15
 #define BIN_TWR_PAYLOAD_SIZE    12
-#define BIN_EXT_FRAME_SIZE      20
-#define BIN_EXT_TWR_PAYLOAD_SIZE 17
+#define BIN_EXT_FRAME_SIZE      27
+#define BIN_EXT_TWR_PAYLOAD_SIZE 24
 #define BIN_NEWTAG_FRAME_SIZE   11
 #define BIN_EUI_FRAME_SIZE      11
 #define BIN_TAG_LOC_FRAME_SIZE     14
@@ -52,8 +52,18 @@ extern "C" {
 /* EUI request commands */
 #define BIN_EUI_CMD_GET         0x01
 
-/* Flags (byte 8) */
+/* Flags (byte 8) - legacy 0xAA TWR frame only. Nothing currently builds a
+ * 0xAA frame (binary_twr_frame_t/send_to_pc_twr_binary() only ever emit
+ * 0xAE) - this is dead code, kept for reference. */
 #define BIN_FLAG_ESCORT     0x01    /* Bit 0: Escort mode active */
+
+/* Extended (0xAE) frame's `flags` field - the live path. Bit 0 is
+ * `stationary` (set from the tag's IMU, tag.c), so escort - pushed from
+ * the host MCU via AT+ESCORT (cmd_fn.c) - uses bit 1 instead. Same byte
+ * flows through unchanged: tag's Final message `flag` -> result_t.flag's
+ * low byte -> this frame's `flags` field. */
+#define BIN_EXT_FLAG_STATIONARY 0x01
+#define BIN_EXT_FLAG_ESCORT     0x02
 
 /*
  * Binary TWR frame structure (packed, 15 bytes)
@@ -82,8 +92,15 @@ typedef struct {
     int16_t  x_cm;              /* [12-13] X coordinate in cm (LE) */
     int16_t  y_cm;              /* [14-15] Y coordinate in cm (LE) */
     int16_t  pdoa_cdeg;         /* [16-17] PDOA in centi-degrees (LE) */
-    uint8_t  checksum;          /* [18] XOR checksum of bytes 1-17 */
-    uint8_t  end;               /* [19] = 0x55 */
+    /* Vitals from the tag's host MCU, carried on the Final message - see
+     * final_accel_t in uwb_frames.h. heart_rate/spo2 are x10 fixed-point,
+     * 0 = no reading. temp is signed hundredths of a degree C. */
+    uint8_t  battery_percent;   /* [18] 0..100 */
+    uint16_t heart_rate_x10;    /* [19-20] bpm x10, 0 = no reading (LE) */
+    uint16_t spo2_x10;          /* [21-22] % x10, 0 = no reading (LE) */
+    int16_t  temp_centi_c;      /* [23-24] hundredths of a degree C (LE) */
+    uint8_t  checksum;          /* [25] XOR checksum of bytes 1-24 */
+    uint8_t  end;               /* [26] = 0x55 */
 } __attribute__((packed)) binary_ext_twr_frame_t;
 
 /*

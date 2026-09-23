@@ -182,6 +182,24 @@ struct tag_info_s
     bool        stationary_imu    : 1; //IMU report that the Tag is stationary
     bool        stationary        : 1; //IMU report that the Tag is stationary
 
+    /* Pushed from the host MCU via the AT+ESCORT command (cmd_fn.c's
+     * f_escort) - OR'd into pTxMsg->final.flag alongside stationary in
+     * initiator_received_response() (tag.c). Bit 1 of that byte (bit 0 is
+     * stationary) - see BIN_EXT_FLAG_ESCORT in binary_uart_protocol.h. */
+    bool        escort_active     : 1;
+
+    /* Vitals pushed from the host MCU (nRF54L15) via the AT+SENS command
+     * (cmd_fn.c's f_sens) - written there, read by
+     * initiator_received_response() (tag.c) into the outgoing Final
+     * message's matching fields. Same write-here/read-by-TX-path shape as
+     * stationary above. 0 = no reading yet for heart_rate/spo2 (e.g. no
+     * finger contact on the host's sensor).
+     */
+    uint8_t     battery_percent;    //0..100
+    uint16_t    heart_rate_x10;     //bpm x10, 0 = no reading
+    uint16_t    spo2_x10;           //% x10, 0 = no reading
+    int16_t     temp_centi_c;       //signed, hundredths of a degree C
+
     /* The number of range sequence, increases on every poll */
     uint16_t    rangeNum;
 

@@ -269,8 +269,15 @@ static void send_to_pc_twr_binary(result_t *pRes) {
   frame[15] = (uint8_t)(y_raw >> 8);
   frame[16] = (uint8_t)((uint16_t)pdoa_cdeg);
   frame[17] = (uint8_t)(((uint16_t)pdoa_cdeg) >> 8);
-  frame[18] = binary_twr_calc_checksum(&frame[1], BIN_EXT_TWR_PAYLOAD_SIZE);
-  frame[19] = BIN_FRAME_END;
+  frame[18] = pRes->battery_percent;
+  frame[19] = (uint8_t)pRes->heart_rate_x10;
+  frame[20] = (uint8_t)(pRes->heart_rate_x10 >> 8);
+  frame[21] = (uint8_t)pRes->spo2_x10;
+  frame[22] = (uint8_t)(pRes->spo2_x10 >> 8);
+  frame[23] = (uint8_t)((uint16_t)pRes->temp_centi_c);
+  frame[24] = (uint8_t)(((uint16_t)pRes->temp_centi_c) >> 8);
+  frame[25] = binary_twr_calc_checksum(&frame[1], BIN_EXT_TWR_PAYLOAD_SIZE);
+  frame[26] = BIN_FRAME_END;
 
   port_tx_msg(frame, BIN_EXT_FRAME_SIZE);
 }
@@ -314,12 +321,15 @@ void send_to_pc_twr(result_t *pRes) {
         app.pConfig->s.reportLevel > 1) {
       /* optimum "RA" output: 58 chars per location: ~200 locations per second
        * */
-      sprintf(str, "RA%04X %04X %08lX %08lX %08lX %1X X:%04X Y:%04X Z:%04X",
+      sprintf(str, "RA%04X %04X %08lX %08lX %08lX %1X X:%04X Y:%04X Z:%04X "
+                   "BAT:%02X HR:%04X SPO2:%04X TEMP:%04X",
               (uint16_t)(pRes->addr16), (uint16_t)(pRes->rangeNum),
               (long int)(pRes->x_cm), (long int)(pRes->y_cm),
               (long int)(pRes->clockOffset_pphm), (uint8_t)(pRes->flag),
               (uint16_t)(pRes->acc_x), (uint16_t)(pRes->acc_y),
-              (uint16_t)(pRes->acc_z));
+              (uint16_t)(pRes->acc_z),
+              (uint8_t)(pRes->battery_percent), (uint16_t)(pRes->heart_rate_x10),
+              (uint16_t)(pRes->spo2_x10), (uint16_t)(pRes->temp_centi_c));
       sprintf(&str[strlen(str)], "\r\n");
       port_tx_msg((uint8_t *)str, strlen(str));
     } else if (app.pConfig->s.reportLevel == 1) {
@@ -382,10 +392,16 @@ void send_to_pc_twr(result_t *pRes) {
                           // zeroed rngOffset used)
               "\"X\":%d," // Normalized accel data X from the Tag, mg
               "\"Y\":%d," // Normalized accel data Y from the Tag, mg
-              "\"Z\":%d"  // Normalized accel data Z from the Tag, mg
+              "\"Z\":%d," // Normalized accel data Z from the Tag, mg
+              "\"Bat\":%d,"  // Battery, from the tag's host MCU, percent
+              "\"HR\":%d,"   // Heart rate x10 bpm, 0 = no reading
+              "\"SpO2\":%d," // SpO2 x10 percent, 0 = no reading
+              "\"Temp\":%d"  // Temperature, centi-degrees C
               "}",
               (int)(pRes->clockOffset_pphm), (int)(pRes->flag),
-              (int)(pRes->acc_x), (int)(pRes->acc_y), (int)(pRes->acc_z));
+              (int)(pRes->acc_x), (int)(pRes->acc_y), (int)(pRes->acc_z),
+              (int)(pRes->battery_percent), (int)(pRes->heart_rate_x10),
+              (int)(pRes->spo2_x10), (int)(pRes->temp_centi_c));
 
       sprintf(&str[strlen(str)], "}");
 

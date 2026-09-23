@@ -5,7 +5,7 @@ as defined in NRF_Juniper/twr_demo/Src/Inc/binary_uart_protocol.h.
 
 Recognizes every frame type defined there:
     0xAA  Legacy TWR frame            (15 bytes)
-    0xAE  Extended TWR frame          (20 bytes)
+    0xAE  Extended TWR frame          (27 bytes; flags bit0=stationary, bit1=escort)
     0xAB  New-tag frame               (11 bytes)
     0xAC  EUI request frame           (11 bytes)
     0xAD  EUI response frame          (11 bytes)
@@ -66,11 +66,25 @@ def _decode_legacy_twr(fields: dict) -> str:
             f"flags=0x{fields['flags']:02X}  X={fields['x_cm']:6d}cm Y={fields['y_cm']:6d}cm")
 
 
+BIN_EXT_FLAG_STATIONARY = 0x01
+BIN_EXT_FLAG_ESCORT     = 0x02
+
+
 def _decode_ext_twr(fields: dict) -> str:
+    hr = fields['heart_rate_x10']
+    spo2 = fields['spo2_x10']
+    hr_str = f"{hr / 10.0:5.1f}bpm" if hr else "  --  "
+    spo2_str = f"{spo2 / 10.0:5.1f}%" if spo2 else " -- "
+    flags = fields['flags']
+    stationary = "STATIONARY" if flags & BIN_EXT_FLAG_STATIONARY else "          "
+    escort = "ESCORT" if flags & BIN_EXT_FLAG_ESCORT else "      "
     return (f"[TWR-EXT  ] tag=0x{fields['tag_id']:04X} anchor=0x{fields['anchor_id']:04X} "
             f"dist={fields['distance_mm']:7d} mm  R={fields['range_num']:3d}  "
-            f"flags=0x{fields['flags']:04X}  X={fields['x_cm']:6d}cm Y={fields['y_cm']:6d}cm "
-            f"pdoa={fields['pdoa_cdeg'] / 100.0:7.2f} deg")
+            f"flags=0x{flags:04X} [{stationary} {escort}]  "
+            f"X={fields['x_cm']:6d}cm Y={fields['y_cm']:6d}cm "
+            f"pdoa={fields['pdoa_cdeg'] / 100.0:7.2f} deg  "
+            f"bat={fields['battery_percent']:3d}% HR={hr_str} SpO2={spo2_str} "
+            f"temp={fields['temp_centi_c'] / 100.0:5.2f}C")
 
 
 def _decode_new_tag(fields: dict) -> str:
@@ -101,10 +115,16 @@ FRAME_TABLE = {
         _decode_legacy_twr,
     ),
     0xAE: (
-        FrameSpec("TWR-EXT", 20, "<BHHIBHhhhBB",
+        # Grew from 20 to 27 bytes: battery_percent/heart_rate_x10/spo2_x10/
+        # temp_centi_c (the tag's host-MCU vitals, from AT+SENS) were added
+        # before the checksum - see binary_uart_protocol.h's
+        # binary_ext_twr_frame_t.
+        FrameSpec("TWR-EXT", 27, "<BHHIBHhhhBHHhBB",
                   ("start", "tag_id", "anchor_id", "distance_mm", "range_num",
-                   "flags", "x_cm", "y_cm", "pdoa_cdeg", "checksum", "end"),
-                  slice(1, 18)),
+                   "flags", "x_cm", "y_cm", "pdoa_cdeg",
+                   "battery_percent", "heart_rate_x10", "spo2_x10", "temp_centi_c",
+                   "checksum", "end"),
+                  slice(1, 25)),
         _decode_ext_twr,
     ),
     0xAB: (

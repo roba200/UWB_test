@@ -1119,13 +1119,24 @@ error_e initiator_received_response(rx_pckt_t_t *prxPckt, tag_info_t *p)
     TS2TS_UWB_MEMCPY( pTxMsg->final.pollTx_ts,     p->pollTx_ts);           // Embed Poll Tx time to the Final message
     TS2TS_UWB_MEMCPY( pTxMsg->final.responseRx_ts, prxPckt->timeStamp);   // Embed Response Rx time to the Final message
     U642TS_UWB_MEMCPY(pTxMsg->final.finalTx_ts,    calcFinalTx64);          // Embed Calculated Final TX time to the Final message
-    pTxMsg->final.flag        = p->stationary;
+    pTxMsg->final.flag        = (p->stationary ? 0x01 : 0x00) |
+                                (p->escort_active ? 0x02 : 0x00);
     pTxMsg->final.acc_x[0]    = p->acc.acc_x[0];
     pTxMsg->final.acc_x[1]    = p->acc.acc_x[1];
     pTxMsg->final.acc_y[0]    = p->acc.acc_y[0];
     pTxMsg->final.acc_y[1]    = p->acc.acc_y[1];
     pTxMsg->final.acc_z[0]    = p->acc.acc_z[0];
     pTxMsg->final.acc_z[1]    = p->acc.acc_z[1];
+
+    /* Vitals latched from the host MCU (nRF54L15) via AT+SENS - see tag.h's
+     * battery_percent/heart_rate_x10/spo2_x10/temp_centi_c comment. */
+    pTxMsg->final.battery_percent = p->battery_percent;
+    pTxMsg->final.heart_rate_x10[0] = (uint8_t)(p->heart_rate_x10);
+    pTxMsg->final.heart_rate_x10[1] = (uint8_t)(p->heart_rate_x10 >> 8);
+    pTxMsg->final.spo2_x10[0]       = (uint8_t)(p->spo2_x10);
+    pTxMsg->final.spo2_x10[1]       = (uint8_t)(p->spo2_x10 >> 8);
+    pTxMsg->final.temp_centi_c[0]   = (uint8_t)((uint16_t)p->temp_centi_c);
+    pTxMsg->final.temp_centi_c[1]   = (uint8_t)(((uint16_t)p->temp_centi_c) >> 8);
 
     /* Transmit over the air */
     p->txState  = Twr_Tx_Final_Sent;    //indicate to TX ISR that the response has been sent

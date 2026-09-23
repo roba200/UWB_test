@@ -23,6 +23,7 @@
 #include "lis2dw12.h"
 #include "crc16.h"
 #include "node.h"
+#include "tag.h"
 
 #define CMD_COLUMN_WIDTH     10
 #define CMD_COLUMN_MAX       4
@@ -324,6 +325,63 @@ REG_FN(f_restore)
     CMD_ENTER_CRITICAL();
     restore_bssConfig();
     CMD_EXIT_CRITICAL();
+    return (CMD_FN_RET_OK);
+}
+
+/* Pushed periodically by the host MCU (nRF54L15) over this same UART -
+ * latches into tag_info_t so the next outgoing Final message can carry it
+ * (see tag.c's initiator_received_response()). No CRC on this line, same
+ * as X_MM/Y_MM/Z_MM above - only device->host lines (EUI, IMU_SLEEP, ...)
+ * carry one. heart_rate/spo2 are x10 fixed-point, 0 = no reading (e.g. no
+ * finger contact on the host's sensor); battery is 0..100; temp is signed
+ * hundredths of a degree C.
+ */
+REG_FN(f_sens)
+{
+    int         battery, heart_rate, spo2, temp;
+    char        str[10];
+    tag_info_t *p;
+
+    if (sscanf(text, "%9s %d %d %d %d", str, &battery, &heart_rate, &spo2, &temp) != 5)
+    {
+        return (NULL);
+    }
+
+    p = getTagInfoPtr();
+    if (!p)
+    {
+        /* Tag app not fully up yet (mode just switched to mPTAG, but
+         * tag_process_init() hasn't run) - same condition task_tag.c's own
+         * tasks wait out via getTagInfoPtr(). */
+        return (NULL);
+    }
+
+    p->battery_percent = (uint8_t)battery;
+    p->heart_rate_x10  = (uint16_t)heart_rate;
+    p->spo2_x10        = (uint16_t)spo2;
+    p->temp_centi_c    = (int16_t)temp;
+
+    return (CMD_FN_RET_OK);
+}
+
+/* Escort Mode active/inactive, pushed from the host MCU - OR'd into the
+ * outgoing Final message's flag byte alongside `stationary` (see tag.c's
+ * initiator_received_response() and BIN_EXT_FLAG_ESCORT in
+ * binary_uart_protocol.h). Single-int form, so the generic command_parser()
+ * pre-parse into `val` is enough - no custom sscanf needed here, unlike
+ * f_sens above.
+ */
+REG_FN(f_escort)
+{
+    tag_info_t *p = getTagInfoPtr();
+
+    if (!p)
+    {
+        return (NULL);
+    }
+
+    p->escort_active = (val != 0);
+
     return (CMD_FN_RET_OK);
 }
 
@@ -1589,6 +1647,8 @@ const char COMMENT_LISTENER        []={"Listen for the UWB packjets using the UW
 const char COMMENT_LSTAT           []={"Displays the statistics inside the Listener application."};
 
 
+const char COMMENT_SENS        []={"Host vitals for this Tag's outgoing Final message.\r\nUsage: \"sens <battery_pct> <heart_rate_x10> <spo2_x10> <temp_centi_c>\". 0 = no reading for heart_rate/spo2."};
+const char COMMENT_ESCORT      []={"Escort Mode active/inactive, from the host MCU.\r\nUsage: \"escort 0\" or \"escort 1\"."};
 const char COMMENT_X           []={"X-coordinate of this Tag in the room, mm. Used only in the tag, which is a part of a Trilateration example running on the fift unit."};
 const char COMMENT_Y           []={"Y-coordinate of this Tag in the room, mm. Used only in the tag, which is a part of a Trilateration example running on the fift unit."};
 const char COMMENT_Z           []={"Z-coordinate of this Tag in the room, mm. Used only in the tag, which is a part of a Trilateration example running on the fift unit."};
@@ -1669,6 +1729,8 @@ const struct command_s known_commands []= {
 #if 1 //(PDOA_TAG == 1)
     {NULL,      mCmdGrp0 | mPTAG,  NULL ,                   COMMENT_PDOA_TAG_OPT},
     {"RCDEL",   mCmdGrp1 | mPTAG,  f_rc_delay,              COMMENT_RCDEL  },
+    {"SENS",    mCmdGrp1 | mPTAG,  f_sens,                  COMMENT_SENS},
+    {"ESCORT",  mCmdGrp1 | mPTAG,  f_escort,                COMMENT_ESCORT},
     {"X_MM",    mCmdGrp1 | mPTAG,  f_x,                     COMMENT_X},
     {"Y_MM",    mCmdGrp1 | mPTAG,  f_y,                     COMMENT_Y},
     {"Z_MM",    mCmdGrp1 | mPTAG,  f_z,                     COMMENT_Z},

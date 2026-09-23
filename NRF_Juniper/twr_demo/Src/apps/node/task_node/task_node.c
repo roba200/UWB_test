@@ -265,6 +265,12 @@ static void RxTask(void const * arg)
                     pMail->res.acc_y = (int16_t)(AR2U16(pFinalMsg->acc_y));
                     pMail->res.acc_z = (int16_t)(AR2U16(pFinalMsg->acc_z));
 
+                    /* Vitals from the tag's host MCU: from pFinalMsg */
+                    pMail->res.battery_percent = pFinalMsg->battery_percent;
+                    pMail->res.heart_rate_x10  = (uint16_t)(AR2U16(pFinalMsg->heart_rate_x10));
+                    pMail->res.spo2_x10        = (uint16_t)(AR2U16(pFinalMsg->spo2_x10));
+                    pMail->res.temp_centi_c    = (int16_t)(AR2U16(pFinalMsg->temp_centi_c));
+
                     /* Convert raw reading of temperature using calibrated values for chips.
                      * Note, the calibrated values available only after dwt_initialize() */
                     //float  temp;

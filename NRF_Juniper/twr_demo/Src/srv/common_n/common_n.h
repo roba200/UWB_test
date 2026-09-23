@@ -97,6 +97,14 @@ struct result_s
     int16_t     acc_y;          //Normalized accel data Y from the Tag, mg: acc_y
     int16_t     acc_z;          //Normalized accel data Z from the Tag, mg: acc_z
 
+    /* Vitals from the Tag's host MCU, carried on the Final message - see
+     * final_accel_t in uwb_frames.h. heart_rate/spo2 are x10 fixed-point,
+     * 0 = no reading. temp is signed hundredths of a degree C. */
+    uint8_t     battery_percent;
+    uint16_t    heart_rate_x10;
+    uint16_t    spo2_x10;
+    int16_t     temp_centi_c;
+
     pdoa_t      pollPDOA;
     pdoa_t      finalPDOA;
 

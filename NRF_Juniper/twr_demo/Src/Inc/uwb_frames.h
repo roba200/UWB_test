@@ -231,6 +231,20 @@ typedef struct
     uint8_t acc_x [2];                      //Normalized accel data X from the Tag, mg
     uint8_t acc_y [2];                      //Normalized accel data Y from the Tag, mg
     uint8_t acc_z [2];                      //Normalized accel data Z from the Tag, mg
+
+    /* Vitals from the host MCU (nRF54L15), latched by the AT+SENS command
+     * (cmd_fn.c) into tag_info_t and copied in here per range attempt - see
+     * initiator_received_response() in tag.c. New fields, NOT a reuse of
+     * acc_x/y/z above (those are aliased to the Trilat fixed-position
+     * payload via a union in tag_info_t, not live sensor data - see tag.h).
+     * heart_rate/spo2 are x10 fixed-point (635 = 63.5), 0 = no reading
+     * (e.g. no finger contact). temp_centi_c is signed hundredths of a
+     * degree C. All little-endian, same convention as acc_x/y/z.
+     */
+    uint8_t battery_percent;                //0..100, from fuel_gauge_get_latest()
+    uint8_t heart_rate_x10 [2];              //bpm x10, 0 = no reading
+    uint8_t spo2_x10       [2];              //% x10, 0 = no reading
+    uint8_t temp_centi_c   [2];              //signed, hundredths of a degree C
 }__attribute__((packed))
 final_accel_t;
 
@@ -307,7 +321,7 @@ typedef struct
     uint8_t exth;                                 //  11 - extension header (0x00: No blink Rate/Listening or other Data)
     uint8_t dwh;                                  //  12 - Decawave Blink Header: 0x01: SENSOR DATA TYPE 1
                                                   //  [According to ISO 24730-62, this octet and any subsequent data can only be interpreted if we identify from the Tag ID field that this is a Decawave tag]
-    uint8_t dwp[27];                              //  13 - 39 Decawave Blink Payload – Defined below for Sensor Data Type 1
+    uint8_t dwp[27];                              //  13 - 39 Decawave Blink Payload ï¿½ Defined below for Sensor Data Type 1
                                                   //  [0] - mask, [1] DWtemp, [2] DWvbat, [3] DWGPIO, [4-9] Magneto, [10-15] Accel, [16-21] Gyro, [22-24] Atmosph Pressure, [25-26] Atmosph Temp
     uint8_t fcs[2] ;                              //  40-41 we allow space for the CRC as it is logically part of the message. However ScenSor TX calculates and adds these bytes.
 }__attribute__((packed))
