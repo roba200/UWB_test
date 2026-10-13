@@ -531,15 +531,16 @@ error_e tag_process_init(void)
     dwt_geteui(euiLong); //read EUI-64 from the chip (or from stored config if OTP is unprogrammed)
     // memcpy(s_node_eui, euiLong, 8);
 
-    /* Tag short ID = the LAST two bytes of the EUI as the "EUI" command prints
-     * it (euiLong[0] is the first hex pair, euiLong[7] the last). For
-     * 1a76d900003a65b0 that is 0x65b0 - the same 16 bits the host puts in the
-     * BLE name/advertisement ("TAG-65b0"), so the ID an anchor reports
-     * (tag_addr in the 0xAF frame) matches what the phone shows. Nodes derive
-     * the tag's short address from the low 16 bits of this blink ID
-     * (task_node.c, AUTO_D2K_ON_TAG_FOUND), so no node change is needed.
-     * Previously this was AR2U16(euiLong) = the FIRST two bytes (0x761a). */
-    pTagInfo->eui64 = (uint16_t)(((uint16_t)euiLong[6] << 8) | euiLong[7]);
+    /* Tag short ID = the low 16 bits of the EUI-64, exactly as node.c derives
+     * the node's eui16 (AR2U16). dwt_geteui() fills euiLong[] least-
+     * significant byte first, so euiLong[0..1] are the per-chip bytes; the
+     * upper bytes are identical across DW3000s (e.g. ...D900003A65B0), which
+     * is why the euiLong[6..7] used before gave every tag 0x65B0.
+     * The "EUI" command prints the EUI MSB-first (like the node's 0xAD
+     * report), so this ID is its LAST four hex digits - e.g. EUI
+     * B0653A0000D975CA -> 0x75CA - and the host's BLE name ("TAG-75CA")
+     * matches the tag_addr an anchor reports. */
+    pTagInfo->eui64 = AR2U16(euiLong);
 
 
     /*
@@ -1005,13 +1006,15 @@ error_e initiator_received_ranging_config(rx_pckt_t_t *pRxPckt, tag_info_t *pTwr
 
         rxtx_configure_t p;
         p.pdwCfg      = &app.pConfig->dwt_config;
-        /* HW frame filtering: PAN ID and tag short address are now known from the
-         * Ranging Config, so enable filtering to accept only responses addressed
-         * to this tag from the correct node's PAN. Blink-type frames not expected
-         * in ranging phase so only DATA and ACK needed. */
-        p.frameFilter     = DWT_FF_ENABLE_802_15_4;
-        p.frameFilterMode = DWT_FF_DATA_EN   /* Response & RangingConfig addressed to this tag */
-                          | DWT_FF_ACK_EN;   /* ACK frames */
+        /* TEST: reverted to the original firmware's behavior (HW frame
+         * filtering left disabled here too) to check whether enabling
+         * DWT_FF_ENABLE_802_15_4 was causing corrupted/misattributed
+         * response frames (seen as X distance flipping sign while
+         * stationary). If this fixes it, the short-address derivation in
+         * tag_process_init() likely needs revisiting before filtering can
+         * be safely re-enabled. */
+        p.frameFilter     = DWT_FF_DISABLE;
+        p.frameFilterMode = DWT_FF_DATA_EN | DWT_FF_ACK_EN;
         p.txAntDelay  = app.pConfig->s.antTx_a;
         p.rxAntDelay  = app.pConfig->s.antRx_a;
         p.panId       = pTwrInfo->env.panID;

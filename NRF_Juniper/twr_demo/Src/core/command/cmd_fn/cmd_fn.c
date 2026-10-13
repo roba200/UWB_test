@@ -1495,8 +1495,12 @@ REG_FN(f_eui)
         uint16_t crc;
         uint8_t *eui = app.eui64;
 
+        /* MSB first, i.e. the EUI-64 as a number - the same order the 0xAD
+         * binary report is displayed in for nodes. app.eui64[] is LSB first
+         * (dwt_geteui()), so the per-chip bytes come out as the LAST four hex
+         * digits, which is what tags/nodes use as their 16-bit short ID. */
         n = sprintf(str, "EUI:%02X%02X%02X%02X%02X%02X%02X%02X",
-                    eui[0], eui[1], eui[2], eui[3], eui[4], eui[5], eui[6], eui[7]);
+                    eui[7], eui[6], eui[5], eui[4], eui[3], eui[2], eui[1], eui[0]);
         crc = calc_crc16((uint8_t *)str, (uint16_t)n);
 
         sprintf(&str[n], ":%04X\r\n", crc);
