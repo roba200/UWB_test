@@ -39,6 +39,7 @@
 extern void send_to_pc_diag_acc(rx_mail_t *pRxMailPckt);
 extern void send_to_pc_twr(result_t *pRes);
 extern void send_to_pc_gearack(uint16_t addr16, uint16_t fast, uint16_t slow);
+extern void send_to_pc_gearnak(uint16_t addr16, uint16_t fast, uint16_t slow);
 extern void trilat_extension_node_put(result_t * pRes);
 //-----------------------------------------------------------------------------
 
@@ -231,12 +232,22 @@ static void RxTask(void const * arg)
             ret = twr_responder_algorithm_rx(pRxPckt, pNodeInfo); /**< Run the bare-metal algorithm */
 
             /* The tag's Response/Update for this Poll is already queued for
-             * delayed Tx in hardware at this point, so reporting GEARACK now
-             * does not delay it. */
-            if (pRxPckt->tag && pRxPckt->tag->gearAckPending)
+             * delayed Tx in hardware at this point, so reporting GEARACK/NAK
+             * now does not delay it. */
+            if (pRxPckt->tag)
             {
-                pRxPckt->tag->gearAckPending = 0;
-                send_to_pc_gearack(pRxPckt->tag->addr16, pRxPckt->tag->multFast, pRxPckt->tag->multSlow);
+                gear_verify_t *gv = &pNodeInfo->gearVerify[pRxPckt->tag->slot];
+
+                if (gv->report == GEAR_VERIFY_REPORT_ACK)
+                {
+                    gv->report = GEAR_VERIFY_REPORT_NONE;
+                    send_to_pc_gearack(pRxPckt->tag->addr16, pRxPckt->tag->multFast, pRxPckt->tag->multSlow);
+                }
+                else if (gv->report == GEAR_VERIFY_REPORT_NAK)
+                {
+                    gv->report = GEAR_VERIFY_REPORT_NONE;
+                    send_to_pc_gearnak(pRxPckt->tag->addr16, pRxPckt->tag->multFast, pRxPckt->tag->multSlow);
+                }
             }
 
             if (ret == _NO_Err_Final)
@@ -348,6 +359,10 @@ static void RxTask(void const * arg)
                     if(tag)
                     {
                         tag->reqUpdatePending = 1;
+
+                        /* runtime-only; clear any stale state from a previous
+                         * tag that occupied this slot */
+                        memset(&pNodeInfo->gearVerify[tag->slot], 0, sizeof(pNodeInfo->gearVerify[tag->slot]));
                     }
                     initDList();
 #endif

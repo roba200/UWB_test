@@ -647,12 +647,26 @@ void send_to_pc_anchor_lost(void) {
 }
 
 /* @brief Notify the host (Node role) that a Ranging Config UPDATE sent for
- * this tag (e.g. via SETGEAR/DEFGEAR) was acknowledged by its next Poll. */
+ * this tag (e.g. via SETGEAR/DEFGEAR) was verified by its Poll interval
+ * after a later Poll got a normal Response. */
 void send_to_pc_gearack(uint16_t addr16, uint16_t fast, uint16_t slow) {
   char *str = CMD_MALLOC(MAX_STR_SIZE);
 
   if (str) {
     sprintf(str, "GEARACK %04X %04X %04X\r\n", addr16, fast, slow);
+    port_tx_msg((uint8_t *)str, strlen(str));
+    CMD_FREE(str);
+  }
+}
+
+/* @brief Notify the host (Node role) that a Ranging Config UPDATE for this
+ * tag failed verification 3 times in a row (Poll interval never matched the
+ * expected Fast rate) and was given up on. */
+void send_to_pc_gearnak(uint16_t addr16, uint16_t fast, uint16_t slow) {
+  char *str = CMD_MALLOC(MAX_STR_SIZE);
+
+  if (str) {
+    sprintf(str, "GEARNAK %04X %04X %04X\r\n", addr16, fast, slow);
     port_tx_msg((uint8_t *)str, strlen(str));
     CMD_FREE(str);
   }

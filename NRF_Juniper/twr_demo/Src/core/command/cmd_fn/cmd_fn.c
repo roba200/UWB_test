@@ -406,6 +406,24 @@ REG_FN(f_escort)
  *        it assign low u16 from addr64 as a new addr16 for every tag
  *        uses tag_Mode, tag_mSlow, tag_mFast as default parameters
  */
+/* @brief Clear the runtime gear-verify bookkeeping for a known-tag slot.
+ *        Called whenever a tag is deleted or (re-)added, so a stale
+ *        lastPollRtc/state/retries/report never carries over to a
+ *        different tag that lands in the same slot later. */
+static void reset_gear_verify(uint16_t slot)
+{
+    if (slot != 0)
+    {
+        node_info_t *pNodeInfo = getNodeInfoPtr();
+
+        if (pNodeInfo)
+        {
+            memset(&pNodeInfo->gearVerify[slot], 0, sizeof(pNodeInfo->gearVerify[slot]));
+        }
+    }
+}
+
+
 REG_FN(f_add_all_to_list)
 {
     const char  *ret = "All tags were added.";
@@ -443,6 +461,7 @@ REG_FN(f_add_all_to_list)
             else
             {
                 tag->reqUpdatePending = 1;    //enable update of Tag's configuration on its next Poll
+                reset_gear_verify(tag->slot);
             }
 
             size--;
@@ -840,6 +859,7 @@ REG_FN(f_add_tag_to_list)
                 tag->multSlow = (uint16_t)multSlow;
                 tag->mode = (uint16_t)mode;
                 tag->reqUpdatePending = 1;                //update Tag's configuration on its next Poll
+                reset_gear_verify(tag->slot);
 
                 hlen = sprintf(str,"JS%04X", 0x5A5A);    // reserve space for length of JS object
                 sprintf(&str[strlen(str)],"{\"TagAdded\": ");
@@ -947,7 +967,8 @@ REG_FN(f_set_gear_all)
                 tag->multSlow = (uint16_t)multSlow;
                 tag->mode |= 1;                    //IMU on
                 tag->reqUpdatePending = 1;          //update Tag's configuration on its next Poll
-                tag->gearAckPending   = 1;          //this Tag still reports its own GEARACK
+                                                     //(node_send_ranging_config sets gearVerify[].state
+                                                     // = 1 the moment the update actually transmits)
 
                 count++;
             }
@@ -995,10 +1016,16 @@ REG_FN(f_del_tag_from_list)
         addr64 = (uint64_t)((((uint64_t)addr1)<<32) | (uint64_t)addr2);
         if(addr64 > 0xFFFF)
         {
+            tag_addr_slot_t *tag = get_tag64_from_knownTagList(addr64);
+            reset_gear_verify(tag ? tag->slot : 0);    //slot is wiped by the delete below - grab it first
+
             del_tag64_from_knownTagList(addr64);
         }
         else
         {
+            tag_addr_slot_t *tag = get_tag16_from_knownTagList((uint16_t)addr64);
+            reset_gear_verify(tag ? tag->slot : 0);    //slot is wiped by the delete below - grab it first
+
             del_tag16_from_knownTagList((uint16_t)addr64);
         }
 

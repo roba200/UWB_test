@@ -42,7 +42,6 @@ typedef struct
 
     struct    {
         uint8_t        reqUpdatePending : 1;    //request to update Tag's configuration during range phase
-        uint8_t        gearAckPending   : 1;    //a Ranging Config UPDATE (gear change) is awaiting GEARACK on the tag's next Poll
     };
 }__attribute__((packed))
 tag_addr_slot_t;

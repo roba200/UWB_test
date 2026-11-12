@@ -137,6 +137,28 @@ struct rx_mail_s
 
 typedef struct rx_mail_s rx_mail_t;
 
+/* Runtime-only verification state for a pending Fast/Slow ranging-config
+ * UPDATE, indexed by tag->slot (1-based; index 0 is unused so a stray
+ * slot==0 lookup can never alias a real tag). Lives in node_info_t, not in
+ * pConfig/knownTagList, so the saved NVM layout is unaffected.
+ * */
+enum gear_verify_report_e
+{
+    GEAR_VERIFY_REPORT_NONE = 0,
+    GEAR_VERIFY_REPORT_ACK  = 1,    /**< RxTask shall print GEARACK and clear this */
+    GEAR_VERIFY_REPORT_NAK  = 2,    /**< RxTask shall print GEARNAK and clear this */
+};
+
+struct gear_verify_s
+{
+    uint32_t lastPollRtc;   /**< RTC timestamp of this tag's previous Poll */
+    uint8_t  state;         /**< 0 = idle, 1 = update sent, waiting to verify */
+    uint8_t  retries;       /**< resend attempts for the current update, 0..3 */
+    uint8_t  report;        /**< enum gear_verify_report_e: pending report for RxTask to print */
+};
+
+typedef struct gear_verify_s gear_verify_t;
+
 /* This structure holds Node's TWR application parameters */
 struct node_info_s
 {
@@ -208,6 +230,8 @@ struct node_info_s
     uint64_t    newTag_addr64;          //new discovered tag address
 
     result_t    result[MAX_KNOWN_TAG_LIST_SIZE]; /* range/X/Y/Xtal_offset result back to the tag */
+
+    gear_verify_t gearVerify[MAX_KNOWN_TAG_LIST_SIZE + 1]; /* indexed by tag->slot (1-based); runtime only, see gear_verify_s */
 
     volatile uint32_t gRtcSFrameZeroCnt;//SuperFrame Cnt RTC timestamp
 

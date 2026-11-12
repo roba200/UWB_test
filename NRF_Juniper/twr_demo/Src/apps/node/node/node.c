@@ -692,7 +692,7 @@ node_send_ranging_config(rx_pckt_t  *pRxPckt,
     else
     {
         tag->reqUpdatePending = 0;
-        tag->gearAckPending   = 1;    //GEARACK will be reported on this tag's next Poll
+        p->gearVerify[tag->slot].state = 1;    //update sent - verify on a later Poll that carries a Response
 
         /* When the Node receives a poll and need to update the Tag, it sends Ranging Config instead of response
          * setup the Ranging Config MAC frame header with Short-Short addressing mode
@@ -1015,6 +1015,19 @@ error_e twr_responder_algorithm_rx(rx_pckt_t *pRxPckt, node_info_t *pNodeInfo)
                 memcpy(&pNodeInfo->pollPDOA, &pRxPckt->PDOA, sizeof(pNodeInfo->pollPDOA));/* node's received PDOA result */
                 memset(&pNodeInfo->finalPDOA, 0, sizeof(pNodeInfo->finalPDOA));
 
+                /* Gear-update verification bookkeeping: elapsed time since this
+                 * tag's previous Poll. RTC is a 24-bit counter, unwrapped the
+                 * same way gRtcSFrameZeroCnt diffs are unwrapped elsewhere. */
+                gear_verify_t *gv               = &pNodeInfo->gearVerify[pRxPckt->tag->slot];
+                uint8_t        wasUpdateRequested = pRxPckt->tag->reqUpdatePending;
+                int32_t        pollIntervalCnt    = (int32_t)(pRxPckt->rtcTimeStamp - gv->lastPollRtc);
+
+                if (pollIntervalCnt < 0)
+                {
+                    pollIntervalCnt += RTC_WKUP_CNT_OVFLW;    // RTC Timer overflow - 24 bit counter
+                }
+                gv->lastPollRtc = pRxPckt->rtcTimeStamp;
+
                 if(pRxPckt->tag->reqUpdatePending)
                 {
                     ret = node_send_ranging_config(pRxPckt, pNodeInfo);  /* send any updates to tag (e.g. change TWR rate) */
@@ -1036,6 +1049,34 @@ error_e twr_responder_algorithm_rx(rx_pckt_t *pRxPckt, node_info_t *pNodeInfo)
                     pNodeInfo->result[pRxPckt->tag->slot].dist_cm            = (float)0xDEAD;
                     pNodeInfo->result[pRxPckt->tag->slot].x_cm               = (float)0xDEAD;
                     pNodeInfo->result[pRxPckt->tag->slot].y_cm               = (float)0xDEAD;
+
+                    /* Verify a previously-sent gear UPDATE only on a Poll that
+                     * got a normal Response this time (not another UPDATE). */
+                    if ((!wasUpdateRequested) && (gv->state == 1))
+                    {
+                        uint32_t intervalMs = (uint32_t)(((float)pollIntervalCnt * WKUP_RESOLUTION_NS) / 1.0e6f);
+                        uint32_t expectedMs = (uint32_t)pNodeInfo->pSfConfig->sfPeriod_ms * pRxPckt->tag->multFast;
+                        uint32_t lowerBound = (expectedMs * 6) / 10;     //-40%
+                        uint32_t upperBound = (expectedMs * 14) / 10;    //+40%
+
+                        if ((intervalMs >= lowerBound) && (intervalMs <= upperBound))
+                        {
+                            gv->state   = 0;
+                            gv->retries = 0;
+                            gv->report  = GEAR_VERIFY_REPORT_ACK;
+                        }
+                        else if (gv->retries < 3)
+                        {
+                            gv->retries++;
+                            pRxPckt->tag->reqUpdatePending = 1;    //resend the update on this tag's next Poll
+                        }
+                        else
+                        {
+                            gv->state   = 0;
+                            gv->retries = 0;
+                            gv->report  = GEAR_VERIFY_REPORT_NAK;
+                        }
+                    }
                 }
                 else
                 {
