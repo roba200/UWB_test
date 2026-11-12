@@ -105,14 +105,14 @@ void command_parser(char *text)
         			json_params=cJSON_GetObjectItem(json_root, CMD_PARAMS);//Get command params
         			if (json_params!=NULL)
         			{//We have a Json so we need to update command.
-        			    sscanf(temp_str,"%9s", cmd);
+        			    sscanf(temp_str,"%19s", cmd);
         			}
         		}
         	}
         }
         else
         {//It is not a Json command
-        	sscanf(text,"%9s %d", cmd,&val);
+        	sscanf(text,"%19s %d", cmd,&val);
         }
 
         for (char *p = cmd; *p; ++p)
