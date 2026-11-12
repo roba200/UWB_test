@@ -65,8 +65,8 @@
 #define AUTO_D2K_ON_TAG_FOUND        1
 #endif
 
-#define D2K_DEFAULT_FAST_MULT        1
-#define D2K_DEFAULT_SLOW_MULT        2
+/* D2K_DEFAULT_FAST_MULT / D2K_DEFAULT_SLOW_MULT moved to run-time values:
+ * app.pConfig->s.defaultFastMult / defaultSlowMult (see default_config.h). */
 #define D2K_DEFAULT_MODE             1
 
 /** 

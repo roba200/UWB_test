@@ -51,6 +51,12 @@
 #define DEFAULT_REPORT_LEVEL        3       /**< what to use as output of TWR: 1:JSON, 2:Reduced, 3:Minimal */
 #define DEFAULT_DEBUG               0       /**< if 1, then the LED_RED used to show an error, if any */
 
+/* Default Fast/Slow ranging multipliers applied to a tag auto-added via D2K
+ * (see AUTO_D2K_ON_TAG_FOUND in app.h). Run-time values, settable via the
+ * DEFGEAR host command - RAM only, not persisted by SAVE. */
+#define DEFAULT_GEAR_FAST_MULT      0xA     /**< 0xA = 1 s */
+#define DEFAULT_GEAR_SLOW_MULT      0xA     /**< 0xA = 1 s */
+
 /* IMU (motion/sleep) config */
 #define IMU_CFG_MAGIC                (0xB105F00DU) /**< marker for a valid IMU config block */
 #define DEFAULT_IMU_INACTIVITY_SEC   (60U)          /**< default inactivity period before System OFF, seconds */
@@ -175,6 +181,9 @@
     .s.imu_cfg_magic          = IMU_CFG_MAGIC, \
     .s.imu_inactivity_seconds = DEFAULT_IMU_INACTIVITY_SEC, \
     \
+    .s.defaultFastMult      = DEFAULT_GEAR_FAST_MULT, \
+    .s.defaultSlowMult      = DEFAULT_GEAR_SLOW_MULT, \
+    \
     .s.antRx_a              = (uint16_t)(0.5* DEFAULT_ANTD), \
     .s.antTx_a              = (uint16_t)(0.5* DEFAULT_ANTD), \
     .s.antRx_b              = (uint16_t)(0.5* DEFAULT_ANTD), \
@@ -233,6 +242,11 @@ struct run_s
      * before this field existed don't read garbage from unformatted NVM. */
     uint32_t    imu_cfg_magic;          /**< must equal IMU_CFG_MAGIC; else defaults are applied */
     uint32_t    imu_inactivity_seconds; /**< inactivity period before System OFF, seconds (1..76, hardware limit of the IMU timer) */
+
+    /* Default Fast/Slow ranging multipliers for a tag auto-added via D2K.
+     * Settable at run-time via the DEFGEAR host command - RAM only. */
+    uint16_t    defaultFastMult;
+    uint16_t    defaultSlowMult;
 
     uint16_t    antRx_a;        /**< antenna delay values for the left port */
     uint16_t    antTx_a;        /**< antenna delay values for the left port */

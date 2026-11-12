@@ -420,8 +420,8 @@ REG_FN(f_add_all_to_list)
         uint16_t        size = getDList_size();
 
         /* below can be removed if the d2k command, i.e. "add all discovered tags to known list automatically", is not used */
-        uint16_t    tag_mFast = D2K_DEFAULT_FAST_MULT; /**< Used to pass a "moving" refresh rate to all tags in the "d2k" command */
-        uint16_t    tag_mSlow = D2K_DEFAULT_SLOW_MULT; /**< Used to pass a "stationary" refresh rate to all tags in the "d2k" command */
+        uint16_t    tag_mFast = pbss->s.defaultFastMult; /**< Used to pass a "moving" refresh rate to all tags in the "d2k" command */
+        uint16_t    tag_mSlow = pbss->s.defaultSlowMult; /**< Used to pass a "stationary" refresh rate to all tags in the "d2k" command */
         uint16_t    tag_Mode = D2K_DEFAULT_MODE;       /**< Used to pass a common "mode" parameter to all tags in the "d2k" command */
 
         pAddr64 = getDList();
@@ -454,6 +454,54 @@ REG_FN(f_add_all_to_list)
 
     return (const char *)(ret);
 }
+
+/**
+ * @brief get/set the default Fast/Slow ranging multipliers used when a tag
+ *        is auto-added via D2K (app.pConfig->s.defaultFastMult/defaultSlowMult).
+ *        RAM only - not persisted by SAVE.
+ *
+ * Usage: "defgear <FAST_HEX> <SLOW_HEX>"   e.g. "defgear A A"
+ *        "defgear"                        -> prints the current values
+ * */
+REG_FN(f_def_gear)
+{
+    const char *ret = NULL;
+
+    unsigned int multFast = 0, multSlow = 0;
+    char         tmp[10];
+
+    int n = sscanf(text, "%8s %x %x", tmp, &multFast, &multSlow);
+
+    if (n == 1)
+    {
+        char *str = CMD_MALLOC(MAX_STR_SIZE);
+
+        if (str)
+        {
+            sprintf(str, "DEFGEAR %04X %04X\r\n", pbss->s.defaultFastMult, pbss->s.defaultSlowMult);
+            port_tx_msg((uint8_t*)str, strlen(str));
+            CMD_FREE(str);
+
+            ret = CMD_FN_RET_OK;
+        }
+    }
+    else if ((n == 3) &&
+             (multFast != 0) && (multFast <= 0x14) &&
+             (multSlow != 0) && (multSlow <= 0x14))
+    {
+        pbss->s.defaultFastMult = (uint16_t)multFast;
+        pbss->s.defaultSlowMult = (uint16_t)multSlow;
+
+        ret = CMD_FN_RET_OK;
+    }
+    else
+    {
+        port_tx_msg((uint8_t*)"error args\r\n", 12);
+    }
+
+    return (ret);
+}
+
 
 REG_FN(f_decaid)
 {
@@ -1732,6 +1780,7 @@ const char COMMENT_ANTRXB          []={"TBD"};
 const char COMMENT_RESTORE         []={"Restores the default configuration, both UWB and System."};
 const char COMMENT_PCREP           []={"Report level to the COM port"};
 const char COMMENT_D2K             []={"Service command to add all Tag from the DList to the KList"};
+const char COMMENT_DEFGEAR         []={"Get/set default Fast/Slow ranging multipliers (<=0x14) used for D2K auto-add. RAM only.\r\nUsage: \"defgear <FAST_HEX> <SLOW_HEX>\" or \"defgear\" to read"};
 const char COMMENT_DIAG            []={"TBD"};
 const char COMMENT_ACCUM           []={"TBD"};
 
@@ -1827,6 +1876,7 @@ const struct command_s known_commands []= {
     {"RESTORE", mCmdGrp1 | mIDLE,  f_restore,               COMMENT_RESTORE},
     {"PCREP",   mCmdGrp1 | mIDLE,  f_twr_report,            COMMENT_PCREP},
     {"D2K",     mCmdGrp1 | mPNODE, f_add_all_to_list,       COMMENT_D2K},
+    {"DEFGEAR", mCmdGrp1 | mPNODE, f_def_gear,              COMMENT_DEFGEAR},
     {"DIAG",    mCmdGrp1 | mIDLE,  f_diag,                  COMMENT_DIAG},
     {"ACCUM",   mCmdGrp1 | mIDLE,  f_acc,                   COMMENT_ACCUM},
 

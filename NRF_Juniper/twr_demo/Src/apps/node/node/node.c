@@ -692,6 +692,7 @@ node_send_ranging_config(rx_pckt_t  *pRxPckt,
     else
     {
         tag->reqUpdatePending = 0;
+        tag->gearAckPending   = 1;    //GEARACK will be reported on this tag's next Poll
 
         /* When the Node receives a poll and need to update the Tag, it sends Ranging Config instead of response
          * setup the Ranging Config MAC frame header with Short-Short addressing mode

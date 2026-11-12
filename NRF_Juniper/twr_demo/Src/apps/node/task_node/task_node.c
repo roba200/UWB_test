@@ -38,6 +38,7 @@
 // extern functions to report output data
 extern void send_to_pc_diag_acc(rx_mail_t *pRxMailPckt);
 extern void send_to_pc_twr(result_t *pRes);
+extern void send_to_pc_gearack(uint16_t addr16, uint16_t fast, uint16_t slow);
 extern void trilat_extension_node_put(result_t * pRes);
 //-----------------------------------------------------------------------------
 
@@ -229,6 +230,15 @@ static void RxTask(void const * arg)
 
             ret = twr_responder_algorithm_rx(pRxPckt, pNodeInfo); /**< Run the bare-metal algorithm */
 
+            /* The tag's Response/Update for this Poll is already queued for
+             * delayed Tx in hardware at this point, so reporting GEARACK now
+             * does not delay it. */
+            if (pRxPckt->tag && pRxPckt->tag->gearAckPending)
+            {
+                pRxPckt->tag->gearAckPending = 0;
+                send_to_pc_gearack(pRxPckt->tag->addr16, pRxPckt->tag->multFast, pRxPckt->tag->multSlow);
+            }
+
             if (ret == _NO_Err_Final)
             {
                 /* Mail the RxPckt to someone : another RTOS thread is awaiting for it */
@@ -332,8 +342,8 @@ static void RxTask(void const * arg)
 
                     tag = add_tag_to_knownTagList(pNodeInfo->newTag_addr64,
                                                   (uint16_t)pNodeInfo->newTag_addr64,
-                                                  D2K_DEFAULT_FAST_MULT,
-                                                  D2K_DEFAULT_SLOW_MULT,
+                                                  app.pConfig->s.defaultFastMult,
+                                                  app.pConfig->s.defaultSlowMult,
                                                   D2K_DEFAULT_MODE);
                     if(tag)
                     {
