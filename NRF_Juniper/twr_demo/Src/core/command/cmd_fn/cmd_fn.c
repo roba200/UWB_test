@@ -818,6 +818,54 @@ REG_FN(f_add_tag_to_list)
 
 
 /**
+ * @brief set the Fast/Slow ranging-rate multipliers for a known tag (by its
+ *        16-bit address) and request an IMU-on ranging-config update on its
+ *        next Poll. Does not touch slot, addr16 or addr64.
+ *
+ * Cap is 0x14 (20): bigger multipliers stretch the Poll period enough to
+ * risk tripping the Tag's own 10 s ANCHOR_LOST timeout.
+ *
+ * Usage: "setgear <ADDR16_HEX> <FAST_HEX> <SLOW_HEX>"   e.g. "setgear 7788 A A"
+ * */
+REG_FN(f_set_gear)
+{
+    const char *ret = NULL;
+
+    unsigned int addr16 = 0, multFast = 0, multSlow = 0;
+    char         tmp[10];
+
+    int n = sscanf(text, "%8s %x %x %x", tmp, &addr16, &multFast, &multSlow);
+
+    if ((n == 4) &&
+        (multFast != 0) && (multFast <= 0x14) &&
+        (multSlow != 0) && (multSlow <= 0x14))
+    {
+        tag_addr_slot_t *tag = get_tag16_from_knownTagList((uint16_t)addr16);
+
+        if (tag)
+        {
+            tag->multFast = (uint16_t)multFast;
+            tag->multSlow = (uint16_t)multSlow;
+            tag->mode |= 1;                    //IMU on
+            tag->reqUpdatePending = 1;          //update Tag's configuration on its next Poll
+
+            ret = CMD_FN_RET_OK;
+        }
+        else
+        {
+            port_tx_msg((uint8_t*)"error notfound\r\n", 16);
+        }
+    }
+    else
+    {
+        port_tx_msg((uint8_t*)"error args\r\n", 12);
+    }
+
+    return (ret);
+}
+
+
+/**
  * @brief delete the tag addr64 from knownTagList
  *          the function will always report the tag was deleted.
  * report:
@@ -1667,6 +1715,7 @@ const char COMMENT_JSTAT           []={"Status in JSON format"};
 const char COMMENT_GETDLIST        []={"Discovered Tags's <UI64_HEX> list in JSON format."};
 const char COMMENT_GETKLIST        []={"Known Tags list in JSON format."};
 const char COMMENT_ADDTAG          []={"Add the tag <UI64_HEX> to Known list using specified parameters.\r\nUsage: \"addtag <UI64_HEX> <NEW_UI16_HEX> <SLOW> <FAST> <MODE>\""};
+const char COMMENT_SETGEAR         []={"Set Fast/Slow ranging multipliers (<=0x14) for a known tag and request an IMU-on update.\r\nUsage: \"setgear <ADDR16_HEX> <FAST_HEX> <SLOW_HEX>\""};
 const char COMMENT_DELTAG          []={"Delete tag <UI16/64_HEX> from Known Tags list\r\nUsage: \"deltag <UI16/64_HEX>\""};
 const char COMMENT_PDOAOFF         []={"Phase Difference offset for this Node\r\nUsage: \" \""};
 const char COMMENT_RNGOFF          []={"Range offset for this node \r\nUsage: \" \""};
@@ -1758,6 +1807,7 @@ const struct command_s known_commands []= {
     {"GETDLIST",mCmdGrp1 | mPNODE,   f_get_discovered_list,   COMMENT_GETDLIST},
     {"GETKLIST",mCmdGrp1 | mPNODE,   f_get_known_list,        COMMENT_GETKLIST},
     {"ADDTAG",  mCmdGrp1 | mPNODE,   f_add_tag_to_list,       COMMENT_ADDTAG},
+    {"SETGEAR", mCmdGrp1 | mPNODE,   f_set_gear,              COMMENT_SETGEAR},
     {"DELTAG",  mCmdGrp1 | mPNODE,   f_del_tag_from_list,     COMMENT_DELTAG},
     {"PDOAOFF", mCmdGrp1 | mPNODE,   f_pdoa_offset,           COMMENT_PDOAOFF},
     {"RNGOFF",  mCmdGrp1 | mPNODE,   f_rng_offset,            COMMENT_RNGOFF},
