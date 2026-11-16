@@ -69,8 +69,14 @@ usb_data_e waitForCommand(uint8_t *pBuf , uint16_t len, uint16_t *read_offset,ui
     {
         uint8_t rx = pBuf[*read_offset];
 
+        /* Binary request frames from the host (anchor) are all 11 bytes and
+         * start with a byte >= 0x80, which text never contains. 0xAC (EUI) is
+         * answered; any other (e.g. the 0xAF version request, not implemented
+         * here yet) is skipped whole. Without this its bytes landed in cmdBuf
+         * and were glued onto the next text command, which then matched no
+         * command and got no reply at all. */
         if ((binEuiLen > 0) ||
-            ((command_type == cmdUNKNOWN_TYPE) && (rx == BIN_EUI_REQ_FRAME_START)))
+            ((command_type == cmdUNKNOWN_TYPE) && (rx >= 0x80)))
         {
             cmdLen = 0;
             command_type = cmdUNKNOWN_TYPE;
@@ -78,7 +84,8 @@ usb_data_e waitForCommand(uint8_t *pBuf , uint16_t len, uint16_t *read_offset,ui
             binEuiBuf[binEuiLen++] = rx;
             if (binEuiLen >= BIN_EUI_FRAME_SIZE)
             {
-                if (binary_eui_validate_request_frame(binEuiBuf))
+                if ((binEuiBuf[0] == BIN_EUI_REQ_FRAME_START) &&
+                    binary_eui_validate_request_frame(binEuiBuf))
                 {
                     send_to_host_eui_binary();
                 }

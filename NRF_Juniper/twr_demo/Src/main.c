@@ -144,6 +144,11 @@ int main(void)
 
   reset_DW3000(); //this will reset DW device
 
+  /* Default (medium) gear is RAM only: never trust NVM for it, an older image
+   * may hold 0 or garbage in this position. DEFGEAR can change it at run time. */
+  app.pConfig->s.defaultFastMult = DEFAULT_GEAR_FAST_MULT;
+  app.pConfig->s.defaultSlowMult = DEFAULT_GEAR_SLOW_MULT;
+
 #if (APPLICATION == TAG)
   {
       /* Apply the magic-guarded default the first time this firmware runs

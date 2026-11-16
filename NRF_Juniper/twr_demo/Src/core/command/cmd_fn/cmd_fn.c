@@ -423,6 +423,18 @@ static void reset_gear_verify(uint16_t slot)
     }
 }
 
+/* Largest gear multiplier: 0x14 superframes = 2 s at the 100 ms default.
+ * Longer Poll gaps risk tripping the Tag's own lost-anchor logic. */
+#define GEAR_MULT_MAX   (0x14U)
+
+/* @brief Clamp a requested gear multiplier to GEAR_MULT_MAX.
+ *        The server may ask for more (e.g. GEAR_2 = 10/50); that is applied
+ *        as 10/20 rather than rejected. 0 stays 0 so callers can reject it. */
+static unsigned int clamp_gear_mult(unsigned int mult)
+{
+    return (mult > GEAR_MULT_MAX) ? GEAR_MULT_MAX : mult;
+}
+
 
 REG_FN(f_add_all_to_list)
 {
@@ -491,6 +503,9 @@ REG_FN(f_def_gear)
 
     int n = sscanf(text, "%8s %x %x", tmp, &multFast, &multSlow);
 
+    multFast = clamp_gear_mult(multFast);
+    multSlow = clamp_gear_mult(multSlow);
+
     if (n == 1)
     {
         char *str = CMD_MALLOC(MAX_STR_SIZE);
@@ -504,9 +519,7 @@ REG_FN(f_def_gear)
             ret = CMD_FN_RET_OK;
         }
     }
-    else if ((n == 3) &&
-             (multFast != 0) && (multFast <= 0x14) &&
-             (multSlow != 0) && (multSlow <= 0x14))
+    else if ((n == 3) && (multFast != 0) && (multSlow != 0))
     {
         pbss->s.defaultFastMult = (uint16_t)multFast;
         pbss->s.defaultSlowMult = (uint16_t)multSlow;
@@ -904,18 +917,35 @@ REG_FN(f_set_gear)
 
     int n = sscanf(text, "%8s %x %x %x", tmp, &addr16, &multFast, &multSlow);
 
-    if ((n == 4) &&
-        (multFast != 0) && (multFast <= 0x14) &&
-        (multSlow != 0) && (multSlow <= 0x14))
+    multFast = clamp_gear_mult(multFast);
+    multSlow = clamp_gear_mult(multSlow);
+
+    if ((n == 4) && (multFast != 0) && (multSlow != 0))
     {
         tag_addr_slot_t *tag = get_tag16_from_knownTagList((uint16_t)addr16);
 
         if (tag)
         {
+            node_info_t *pNodeInfo = getNodeInfoPtr();
+
+            CMD_ENTER_CRITICAL();
+
             tag->multFast = (uint16_t)multFast;
             tag->multSlow = (uint16_t)multSlow;
             tag->mode |= 1;                    //IMU on
             tag->reqUpdatePending = 1;          //update Tag's configuration on its next Poll
+
+            /* A new request supersedes any change still being verified:
+             * restart the retry budget, drop a stale ACK/NAK.
+             * lastPollRtc is kept - it is needed to time the next Poll. */
+            if (pNodeInfo && (tag->slot != 0))
+            {
+                pNodeInfo->gearVerify[tag->slot].state   = 0;
+                pNodeInfo->gearVerify[tag->slot].retries = 0;
+                pNodeInfo->gearVerify[tag->slot].report  = GEAR_VERIFY_REPORT_NONE;
+            }
+
+            CMD_EXIT_CRITICAL();
 
             ret = CMD_FN_RET_OK;
         }
@@ -950,9 +980,10 @@ REG_FN(f_set_gear_all)
 
     int n = sscanf(text, "%15s %x %x", tmp, &multFast, &multSlow);
 
-    if ((n == 3) &&
-        (multFast != 0) && (multFast <= 0x14) &&
-        (multSlow != 0) && (multSlow <= 0x14))
+    multFast = clamp_gear_mult(multFast);
+    multSlow = clamp_gear_mult(multSlow);
+
+    if ((n == 3) && (multFast != 0) && (multSlow != 0))
     {
         tag_addr_slot_t *tag = get_knownTagList();
         int             count = 0;
@@ -1845,8 +1876,8 @@ const char COMMENT_JSTAT           []={"Status in JSON format"};
 const char COMMENT_GETDLIST        []={"Discovered Tags's <UI64_HEX> list in JSON format."};
 const char COMMENT_GETKLIST        []={"Known Tags list in JSON format."};
 const char COMMENT_ADDTAG          []={"Add the tag <UI64_HEX> to Known list using specified parameters.\r\nUsage: \"addtag <UI64_HEX> <NEW_UI16_HEX> <SLOW> <FAST> <MODE>\""};
-const char COMMENT_SETGEAR         []={"Set Fast/Slow ranging multipliers (<=0x14) for a known tag and request an IMU-on update.\r\nUsage: \"setgear <ADDR16_HEX> <FAST_HEX> <SLOW_HEX>\""};
-const char COMMENT_SETGEARALL      []={"Set Fast/Slow ranging multipliers (<=0x14) for every known tag at once.\r\nUsage: \"setgearall <FAST_HEX> <SLOW_HEX>\""};
+const char COMMENT_SETGEAR         []={"Set Fast/Slow ranging multipliers (>0x14 clamped to 0x14) for a known tag and request an IMU-on update.\r\nUsage: \"setgear <ADDR16_HEX> <FAST_HEX> <SLOW_HEX>\""};
+const char COMMENT_SETGEARALL      []={"Set Fast/Slow ranging multipliers (>0x14 clamped to 0x14) for every known tag at once.\r\nUsage: \"setgearall <FAST_HEX> <SLOW_HEX>\""};
 const char COMMENT_DELTAG          []={"Delete tag <UI16/64_HEX> from Known Tags list\r\nUsage: \"deltag <UI16/64_HEX>\""};
 const char COMMENT_PDOAOFF         []={"Phase Difference offset for this Node\r\nUsage: \" \""};
 const char COMMENT_RNGOFF          []={"Range offset for this node \r\nUsage: \" \""};
@@ -1863,7 +1894,7 @@ const char COMMENT_ANTRXB          []={"TBD"};
 const char COMMENT_RESTORE         []={"Restores the default configuration, both UWB and System."};
 const char COMMENT_PCREP           []={"Report level to the COM port"};
 const char COMMENT_D2K             []={"Service command to add all Tag from the DList to the KList"};
-const char COMMENT_DEFGEAR         []={"Get/set default Fast/Slow ranging multipliers (<=0x14) used for D2K auto-add. RAM only.\r\nUsage: \"defgear <FAST_HEX> <SLOW_HEX>\" or \"defgear\" to read"};
+const char COMMENT_DEFGEAR         []={"Get/set default Fast/Slow ranging multipliers (>0x14 clamped to 0x14) used when a tag joins. RAM only.\r\nUsage: \"defgear <FAST_HEX> <SLOW_HEX>\" or \"defgear\" to read"};
 const char COMMENT_DIAG            []={"TBD"};
 const char COMMENT_ACCUM           []={"TBD"};
 

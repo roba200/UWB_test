@@ -982,6 +982,23 @@ error_e twr_responder_algorithm_rx(rx_pckt_t *pRxPckt, node_info_t *pNodeInfo)
 
             if (pRxPckt->tag)
             {
+                /* A known tag blinking again has re-joined (woke from System OFF,
+                 * rebooted, or lost this node). It must restart at the default
+                 * gear (DEFGEAR, medium), not at whatever gear it had before:
+                 * the server resets its own view to medium in the same case. */
+                gear_verify_t *gv = &pNodeInfo->gearVerify[pRxPckt->tag->slot];
+
+                if (gv->state == 1)
+                {
+                    gv->report = GEAR_VERIFY_REPORT_NAK;    //a gear change was still being verified - close it out
+                }
+                gv->state      = 0;
+                gv->retries    = 0;
+                gv->stationary = 0;
+
+                pRxPckt->tag->multFast = app.pConfig->s.defaultFastMult;
+                pRxPckt->tag->multSlow = app.pConfig->s.defaultSlowMult;
+
                 pRxPckt->tag->reqUpdatePending = 0;
                 ret = node_send_ranging_config(pRxPckt, pNodeInfo);
             }
@@ -1055,7 +1072,10 @@ error_e twr_responder_algorithm_rx(rx_pckt_t *pRxPckt, node_info_t *pNodeInfo)
                     if ((!wasUpdateRequested) && (gv->state == 1))
                     {
                         uint32_t intervalMs = (uint32_t)(((float)pollIntervalCnt * WKUP_RESOLUTION_NS) / 1.0e6f);
-                        uint32_t expectedMs = (uint32_t)pNodeInfo->pSfConfig->sfPeriod_ms * pRxPckt->tag->multFast;
+                        /* The tag polls every multSlow superframes while stationary,
+                         * every multFast while moving (tag.c RTC callback). */
+                        uint16_t mult       = gv->stationary ? pRxPckt->tag->multSlow : pRxPckt->tag->multFast;
+                        uint32_t expectedMs = (uint32_t)pNodeInfo->pSfConfig->sfPeriod_ms * mult;
                         uint32_t lowerBound = (expectedMs * 6) / 10;     //-40%
                         uint32_t upperBound = (expectedMs * 14) / 10;    //+40%
 
@@ -1112,6 +1132,10 @@ error_e twr_responder_algorithm_rx(rx_pckt_t *pRxPckt, node_info_t *pNodeInfo)
             if (pRxPckt->tag && (pRxPckt->tag == pNodeInfo->pDestTag))
             {
                 memcpy(&pNodeInfo->finalPDOA, &pRxPckt->PDOA, sizeof(pNodeInfo->finalPDOA));
+
+                /* remember the tag's motion state for gear-change verification */
+                pNodeInfo->gearVerify[pRxPckt->tag->slot].stationary =
+                        (((final_msg_accel_t*)pMsg)->final.flag & 0x01) ? 1 : 0;
 
                 node_read_final_diagnostics(pRxPckt);
                 ret = _NO_Err_Final;

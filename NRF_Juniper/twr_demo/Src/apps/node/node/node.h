@@ -155,6 +155,7 @@ struct gear_verify_s
     uint8_t  state;         /**< 0 = idle, 1 = update sent, waiting to verify */
     uint8_t  retries;       /**< resend attempts for the current update, 0..3 */
     uint8_t  report;        /**< enum gear_verify_report_e: pending report for RxTask to print */
+    uint8_t  stationary;    /**< IMU stationary bit (flag bit0) from this tag's last Final */
 };
 
 typedef struct gear_verify_s gear_verify_t;
@@ -229,7 +230,7 @@ struct node_info_s
 
     uint64_t    newTag_addr64;          //new discovered tag address
 
-    result_t    result[MAX_KNOWN_TAG_LIST_SIZE]; /* range/X/Y/Xtal_offset result back to the tag */
+    result_t    result[MAX_KNOWN_TAG_LIST_SIZE + 1]; /* range/X/Y/Xtal_offset result back to the tag; indexed by tag->slot (1-based) */
 
     gear_verify_t gearVerify[MAX_KNOWN_TAG_LIST_SIZE + 1]; /* indexed by tag->slot (1-based); runtime only, see gear_verify_s */
 

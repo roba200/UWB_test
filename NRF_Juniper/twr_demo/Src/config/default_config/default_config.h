@@ -51,15 +51,18 @@
 #define DEFAULT_REPORT_LEVEL        3       /**< what to use as output of TWR: 1:JSON, 2:Reduced, 3:Minimal */
 #define DEFAULT_DEBUG               0       /**< if 1, then the LED_RED used to show an error, if any */
 
-/* Default Fast/Slow ranging multipliers applied to a tag auto-added via D2K
- * (see AUTO_D2K_ON_TAG_FOUND in app.h). Run-time values, settable via the
- * DEFGEAR host command - RAM only, not persisted by SAVE. */
+/* Default Fast/Slow ranging multipliers (medium gear) applied to a tag when it
+ * joins or re-joins this node (see AUTO_D2K_ON_TAG_FOUND in app.h and the
+ * Blink handler in node.c). Settable via the DEFGEAR host command.
+ * RAM only: main() re-applies these on every boot, whatever NVM holds. */
 #define DEFAULT_GEAR_FAST_MULT      0xA     /**< 0xA = 1 s */
 #define DEFAULT_GEAR_SLOW_MULT      0xA     /**< 0xA = 1 s */
 
-/* IMU (motion/sleep) config */
-#define IMU_CFG_MAGIC                (0xB105F00DU) /**< marker for a valid IMU config block */
-#define DEFAULT_IMU_INACTIVITY_SEC   (60U)          /**< default inactivity period before System OFF, seconds */
+/* IMU (motion/sleep) config.
+ * The magic was bumped when the default changed 60 s -> 15 s, so a device
+ * that SAVEd the old 60 s value picks up the new default once. */
+#define IMU_CFG_MAGIC                (0xB105F00EU) /**< marker for a valid IMU config block */
+#define DEFAULT_IMU_INACTIVITY_SEC   (15U)          /**< no motion for this long -> System OFF, seconds */
 
 /* Slot configuration */
 #define DEFAULT_SLOT_PERIOD_MS      5       /**< Slot period (ms), the best of what the implementation can achieve */
@@ -243,12 +246,7 @@ struct run_s
     uint32_t    imu_cfg_magic;          /**< must equal IMU_CFG_MAGIC; else defaults are applied */
     uint32_t    imu_inactivity_seconds; /**< inactivity period before System OFF, seconds (1..76, hardware limit of the IMU timer) */
 
-    /* Default Fast/Slow ranging multipliers for a tag auto-added via D2K.
-     * Settable at run-time via the DEFGEAR host command - RAM only. */
-    uint16_t    defaultFastMult;
-    uint16_t    defaultSlowMult;
-
-    uint16_t    antRx_a;        /**< antenna delay values for the left port */
+    uint16_t    antRx_a;       /**< antenna delay values for the left port */
     uint16_t    antTx_a;        /**< antenna delay values for the left port */
     uint16_t    antRx_b;        /**< antenna delay values for the right port  */
     uint16_t    fixed_pos_x_mm; /**< max 65_000 mm */
@@ -264,6 +262,13 @@ struct run_s
     dwt_sts_cp_iv_t     stsIv;          /**< AES IV to be used to set the initial IV */
     int                 stsStatic; /**< Configuration to STS/IV : value 0 = dynamic STS, 1 = fixed STS*/
     uint8_t             xtalTrim;
+
+    /* Default Fast/Slow (medium) gear multipliers. Kept at the END of run_s
+     * on purpose: inserting them earlier shifted antRx_a, lotId, stsKey, ...
+     * so firmware flashed over an older NVM image misread those fields.
+     * RAM only - main() overwrites them with DEFAULT_GEAR_* on every boot. */
+    uint16_t    defaultFastMult;
+    uint16_t    defaultSlowMult;
 }__attribute__((__packed__));
 
 typedef struct run_s run_t;
